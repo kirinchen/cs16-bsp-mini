@@ -1,0 +1,5 @@
+*.bsp
+*.nav
+*.wad
+__pycache__/
+*.pyc
