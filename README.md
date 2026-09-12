@@ -1,7 +1,8 @@
-# goldsrc-bsp-mini
+# cs16-bsp-mini
 
-Shrink a compiled GoldSrc / Counter-Strike 1.6 map (`.bsp`) into a playable "mini" version
-**without decompiling or recompiling**. Pure Python 3, no dependencies.
+Shrink a compiled Counter-Strike 1.6 map (`.bsp`) into a playable "mini" version
+**without decompiling or recompiling**. Pure Python 3, no dependencies. Works on any
+GoldSrc engine map (Half-Life, TFC, Day of Defeat) as well.
 
 `de_dust2_mini` style maps, for any map, in seconds:
 
