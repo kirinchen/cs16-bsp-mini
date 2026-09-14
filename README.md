@@ -21,7 +21,7 @@ original map, just smaller.
 ## Quick start
 
 ```
-python tools/bspscale.py de_aztec.bsp de_aztec_mini.bsp 0.5 0.5 0.5
+python tools/bspscale.py de_aztec.bsp de_aztec_mini.bsp 0.5 0.5 0.75
 python tools/reach.py    de_aztec_mini.bsp 8 stand
 python tools/bspcheck.py de_aztec.bsp de_aztec_mini.bsp
 ```
