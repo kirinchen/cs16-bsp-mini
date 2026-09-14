@@ -59,7 +59,8 @@ Direct BSP v30 lump surgery:
   the player's half-size. Scaling those distances directly would shrink the expansion and let
   the player sink 18 units into the floor. The scaler subtracts the per-hull Minkowski
   expansion, scales, and adds it back, per hull. Subtrees the compiler shared between hulls
-  are split per hull, then planes and identical subtrees are deduplicated (limit 32767 each).
+  are split per hull and written in pre-order, because the engine refuses any clipnode whose
+  index is below its hull's head node (`PM_HullPointContents: bad node number`).
 - **Entities**: `MaxRange`, door `lip`, `func_tracktrain` wheels/speed, `bombradius`,
   `env_explosion` magnitude are scaled. Everything else is left alone.
 

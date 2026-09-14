@@ -93,8 +93,7 @@ MODEL = '<3f3f3f4iiii'
 models = arr(14, MODEL)
 sys.setrecursionlimit(100000)
 new_clip = []
-clip_index = {}       # (plane, child0, child1) -> new index  (collapses subtrees that end up identical)
-copy_memo = {}        # (hull, old index) -> new index
+copy_memo = {}        # (tree, old index) -> new index
 plane_memo = {}
 
 
@@ -109,28 +108,37 @@ def hull_plane(h, pidx):
     return plane_memo[key]
 
 
-def copy_clip(h, idx):
-    """copy a clipnode subtree for hull h; subtrees shared between hulls in the source get
-    their own per-hull copy because the hull expansion differs"""
+def copy_clip(tree, h, idx):
+    """copy a clipnode tree for (model, hull) in PRE-ORDER: the engine requires every node of a
+    hull to have an index >= that hull's head node (PM_HullPointContents: bad node number).
+    Subtrees the compiler shared between hulls get a per-hull copy because the expansion differs."""
     if idx < 0:
         return idx
-    key = (h, idx)
+    key = (tree, idx)
     if key in copy_memo:
         return copy_memo[key]
-    copy_memo[key] = None  # guard against cycles (should not exist)
+    ni = len(new_clip)
+    new_clip.append(None)
+    copy_memo[key] = ni
     pn, c0, c1 = clipnodes[idx]
-    row = (hull_plane(h, pn), copy_clip(h, c0), copy_clip(h, c1))
-    if row not in clip_index:
-        clip_index[row] = len(new_clip)
-        new_clip.append(list(row))
-    copy_memo[key] = clip_index[row]
-    return clip_index[row]
+    new_clip[ni] = [hull_plane(h, pn), copy_clip(tree, h, c0), copy_clip(tree, h, c1)]
+    return ni
 
 
+for mi, m in enumerate(models):
+    for h in (1, 2, 3):
+        m[9 + h] = copy_clip((mi, h), h, m[9 + h])
+assert len(new_clip) <= 32767, "too many clipnodes after per-hull split"
 for m in models:
     for h in (1, 2, 3):
-        m[9 + h] = copy_clip(h, m[9 + h])
-assert len(new_clip) <= 32767, "too many clipnodes after per-hull split"
+        root = m[9 + h]
+        stack = [root]
+        while stack:
+            i = stack.pop()
+            if i < 0:
+                continue
+            assert i >= root, "clipnode ordering broken"
+            stack.extend(c for c in new_clip[i][1:3] if c > i)  # children always after parent
 print("planes", len(planes), "->", len(new_planes), "clipnodes", len(clipnodes), "->", len(new_clip))
 clipnodes = new_clip
 

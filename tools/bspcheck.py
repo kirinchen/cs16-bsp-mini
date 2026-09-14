@@ -4,6 +4,7 @@ usage: python bspcheck.py original.bsp scaled.bsp [x y z ...]
 
 Checks:
   * every lump index (planes, clipnodes, nodes, faces, texinfo, marksurfaces) is in range
+  * clipnode ordering the engine enforces (no node index below its hull's head node)
   * every player spawn sits in empty space in the standing (hull 1) and crouching (hull 3) hulls
   * 40 units below every spawn is solid (i.e. there is a floor)
 Optional: extra "x y z" triples are probed in hull 1 / hull 3 of the scaled map and their
@@ -58,6 +59,26 @@ def check_indices(B):
     return bad
 
 
+def check_clip_order(B):
+    """engine rule (PM_HullPointContents): every node reachable from a hull's head node must have
+    an index >= that head node"""
+    bad = 0
+    for m in B['models']:
+        for h in (1, 2, 3):
+            root = m[9 + h]
+            seen = set()
+            stack = [root]
+            while stack:
+                i = stack.pop()
+                if i < 0 or i in seen:
+                    continue
+                seen.add(i)
+                if i < root:
+                    bad += 1
+                stack.extend(B['clip'][i][1:3])
+    return bad
+
+
 def spawns(B):
     out = []
     for blk in re.findall(r'\{([^}]*)\}', B['ents']):
@@ -71,6 +92,7 @@ def main():
     A = load(sys.argv[1])
     M = load(sys.argv[2])
     print("index errors: orig", check_indices(A), "scaled", check_indices(M))
+    print("clipnode order errors: orig", check_clip_order(A), "scaled", check_clip_order(M))
     for name, B in (("orig", A), ("scaled", M)):
         sp = spawns(B)
         h1 = {contents(B, 1, p) for p in sp}

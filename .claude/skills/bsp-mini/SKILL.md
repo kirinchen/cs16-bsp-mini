@@ -84,4 +84,6 @@ A passage of width W and height H is standing-passable at scale s when
 - Lightmaps: texture vectors are inverse-scaled and nudged per face so lightmap extents
   are bit-identical to what the original compiler wrote (inferred from the lighting lump).
 - Plane count: only referenced planes are kept and deduplicated (engine limit 32767).
+- Clipnode order: every node of a hull must have an index >= its head node, or the game
+  dies with `PM_HullPointContents: bad node number`. `bspcheck.py` verifies this.
 - Spawns are moved out of walls automatically; hostages keep their floor-level origin.
