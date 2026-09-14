@@ -91,35 +91,48 @@ CLIP = '<ihh'
 clipnodes = arr(9, CLIP)
 MODEL = '<3f3f3f4iiii'
 models = arr(14, MODEL)
-hull_of = {}
+sys.setrecursionlimit(100000)
+new_clip = []
+clip_index = {}       # (plane, child0, child1) -> new index  (collapses subtrees that end up identical)
+copy_memo = {}        # (hull, old index) -> new index
+plane_memo = {}
 
 
-def walk(idx, h):
-    stack = [idx]
-    while stack:
-        i = stack.pop()
-        if i < 0 or i in hull_of:
-            continue
-        hull_of[i] = h
-        stack.extend(clipnodes[i][1:3])
+def hull_plane(h, pidx):
+    key = (h, pidx)
+    if key not in plane_memo:
+        nx, ny, nz, dist, t = planes[pidx]
+        n0 = (nx, ny, nz)
+        d0 = dist - expand(n0, HULLS[h])
+        n2, d0s = xform_plane(n0, d0)
+        plane_memo[key] = add_plane(n2, d0s + expand(n2, HULLS[h]))
+    return plane_memo[key]
+
+
+def copy_clip(h, idx):
+    """copy a clipnode subtree for hull h; subtrees shared between hulls in the source get
+    their own per-hull copy because the hull expansion differs"""
+    if idx < 0:
+        return idx
+    key = (h, idx)
+    if key in copy_memo:
+        return copy_memo[key]
+    copy_memo[key] = None  # guard against cycles (should not exist)
+    pn, c0, c1 = clipnodes[idx]
+    row = (hull_plane(h, pn), copy_clip(h, c0), copy_clip(h, c1))
+    if row not in clip_index:
+        clip_index[row] = len(new_clip)
+        new_clip.append(list(row))
+    copy_memo[key] = clip_index[row]
+    return clip_index[row]
 
 
 for m in models:
     for h in (1, 2, 3):
-        walk(m[9 + h], h)
-cache = {}
-for i, cn in enumerate(clipnodes):
-    h = hull_of.get(i, 1)
-    key = (h, cn[0])
-    if key not in cache:
-        nx, ny, nz, dist, t = planes[cn[0]]
-        n0 = (nx, ny, nz)
-        d0 = dist - expand(n0, HULLS[h])
-        n2, d0s = xform_plane(n0, d0)
-        cache[key] = add_plane(n2, d0s + expand(n2, HULLS[h]))
-    cn[0] = cache[key]
-print("planes", len(planes), "->", len(new_planes), "clipnodes", len(clipnodes),
-      "unreached", sum(1 for i in range(len(clipnodes)) if i not in hull_of))
+        m[9 + h] = copy_clip(h, m[9 + h])
+assert len(new_clip) <= 32767, "too many clipnodes after per-hull split"
+print("planes", len(planes), "->", len(new_planes), "clipnodes", len(clipnodes), "->", len(new_clip))
+clipnodes = new_clip
 
 # ---------- vertices ----------
 verts = arr(3, '<3f')

@@ -8,7 +8,7 @@ GoldSrc engine map (Half-Life, TFC, Day of Defeat) as well.
 
 | map | scale | fully walkable standing |
 |---|---|---|
-| de_aztec | 1/2 | yes |
+| de_aztec | XY 1/2, Z 3/4 | yes (bridge underside is only 98 units high) |
 | de_inferno | 1/2 | yes |
 | de_survivor | 7/16 | yes |
 | de_airstrip | 9/16 | yes |
@@ -39,6 +39,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 |---|---|
 | `tools/bspscale.py IN OUT SX SY SZ` | the scaler |
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
+| `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |
 | `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, every spawn in open air with a floor below, optional point probes |
 | `tools/bspinfo.py MAP...` | lumps, bounds, entity classes, texture list |
 | `tools/ents.py MAP...` | spawn / objective coordinates |
@@ -57,7 +58,8 @@ Direct BSP v30 lump surgery:
 - **Clip hulls** are the tricky part. GoldSrc stores collision as planes already expanded by
   the player's half-size. Scaling those distances directly would shrink the expansion and let
   the player sink 18 units into the floor. The scaler subtracts the per-hull Minkowski
-  expansion, scales, and adds it back, per hull, then deduplicates planes (engine limit 32767).
+  expansion, scales, and adds it back, per hull. Subtrees the compiler shared between hulls
+  are split per hull, then planes and identical subtrees are deduplicated (limit 32767 each).
 - **Entities**: `MaxRange`, door `lip`, `func_tracktrain` wheels/speed, `bombradius`,
   `env_explosion` magnitude are scaled. Everything else is left alone.
 

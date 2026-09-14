@@ -1,7 +1,9 @@
 """Reachability check: BFS a player-sized box over a grid using the BSP collision hulls.
-usage: python reach.py map.bsp [grid=8] [stand]
+usage: python reach.py map.bsp [grid=8] [stand] [dump=cells.json]
   grid  : XY sample spacing in units (8 is a good default; smaller is slower)
-  stand : only use the standing hull; default allows crouching too"""
+  stand : only use the standing hull; default allows crouching too
+  dump= : write the reachable cell set to a JSON file (for reachdiff.py)
+"""
 import struct, sys, re
 from collections import deque
 path=sys.argv[1]; G=int(sys.argv[2]) if len(sys.argv)>2 else 8
@@ -107,3 +109,6 @@ for name,p in goals.items():
         ok=any(c[0]==sp[0] and c[1]==sp[1] and abs(c[2]-sp[2])<40 for c in seen)
     print(f"  {name:32s} {'REACHABLE' if ok else 'NOT reachable'}  {sp}")
 print("both-spawn reachable:",all(near_spot(p) in seen for p in T+CT))
+for a in sys.argv[3:]:
+    if a.startswith('dump='):
+        import json; json.dump(sorted(set((c[0],c[1],round(c[2])) for c in seen)),open(a[5:],'w'))

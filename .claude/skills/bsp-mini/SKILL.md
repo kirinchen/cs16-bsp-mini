@@ -41,7 +41,17 @@ are rescaled, lightmaps and visibility are reused unchanged.
    python tools/bspcheck.py MAP.bsp out_0.5.bsp  # indices, spawns, floors
    ```
    Pick the smallest uniform scale where everything the original reaches standing is
-   still reachable standing. If the map has low doorways or vents, uniform scaling may
+   still reachable standing. Then check that no *area* became crouch-only, because the
+   BFS will happily crouch through a low bridge or doorway on the way to an objective and
+   players experience that as an invisible wall:
+   ```
+   python tools/reach.py out.bsp 8 stand  dump=s.json
+   python tools/reach.py out.bsp 8        dump=c.json
+   python tools/reachdiff.py s.json c.json 8 SX SY SZ
+   ```
+   Compare with the same diff on the original. Big clusters (a room, a channel) mean a
+   doorway or ceiling is now under 72: measure its original height and raise Z so that
+   `height * SZ > 72`. Thin one-cell strips along walls are eaves and can be ignored. If the map has low doorways or vents, uniform scaling may
    not go below ~0.75; then use a non-uniform scale (smaller XY, larger Z), e.g.
    `0.625 0.625 0.8125`, and say so explicitly in the report.
 
