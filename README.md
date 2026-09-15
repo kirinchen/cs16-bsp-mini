@@ -27,7 +27,14 @@ python tools/bspcheck.py de_aztec.bsp de_aztec_mini.bsp
 ```
 
 Drop `de_aztec_mini.bsp` into `cstrike/maps/` and `map de_aztec_mini`.
-Bots regenerate the `.nav` on first load.
+
+For bots, scale the original hand-tuned mesh instead of letting the game generate one on
+the shrunken geometry (auto-generation leaves ladders unconnected and cuts narrow ledges
+into fragments):
+
+```
+python tools/navscale.py de_aztec.nav de_aztec_mini.nav 0.5 0.5 0.75 de_aztec_mini.bsp
+```
 
 Use scale factors that are exact in binary (multiples of 1/16: 0.375, 0.4375, 0.5, 0.5625,
 0.625, 0.75, 0.8125) so vertex coordinates carry no rounding error. Non-uniform scales are
@@ -39,6 +46,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 |---|---|
 | `tools/bspscale.py IN OUT SX SY SZ` | the scaler |
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
+| `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
 | `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |
 | `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, every spawn in open air with a floor below, optional point probes |
 | `tools/bspinfo.py MAP...` | lumps, bounds, entity classes, texture list |
@@ -64,8 +72,8 @@ Direct BSP v30 lump surgery:
 - **Entities**: `MaxRange`, door `lip`, `func_tracktrain` wheels/speed, `bombradius`,
   `env_explosion` magnitude are scaled. Everything else is left alone.
 
-Not handled: lightmap resampling (not needed with this approach), `.nav` files, and
-anything that only exists in the game code (weapon ranges, fall damage).
+Not handled: lightmap resampling (not needed with this approach) and anything that only
+exists in the game code (weapon ranges, fall damage).
 
 ## Claude Code skill
 

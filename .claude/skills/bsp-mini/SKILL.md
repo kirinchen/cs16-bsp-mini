@@ -56,7 +56,12 @@ are rescaled, lightmaps and visibility are reused unchanged.
    `0.625 0.625 0.8125`, and say so explicitly in the report.
 
 5. **Deliver** as `MAPNAME_mini.bsp` next to the original, copy `MAPNAME.txt` to
-   `MAPNAME_mini.txt`. Do not ship a `.nav`; bots regenerate it on first load.
+   `MAPNAME_mini.txt`, and scale the original bot mesh:
+   ```
+   python tools/navscale.py MAPNAME.nav MAPNAME_mini.nav SX SY SZ MAPNAME_mini.bsp
+   ```
+   Do not let the game auto-generate a mesh on the scaled map: it reports
+   `Unconnected ladder top` for most ladders and fragments narrow ledges.
 
 ## Player size reference (GoldSrc)
 
