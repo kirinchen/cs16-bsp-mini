@@ -313,24 +313,51 @@ def hull_contents(hull, p):
     return n
 
 
+MARGIN = 8
+
+
+def clearance(q):
+    """distance (capped at MARGIN) to the nearest solid in +-x / +-y, in both player hulls"""
+    best = MARGIN
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for k in range(1, MARGIN + 1):
+            r = (q[0] + dx * k, q[1] + dy * k, q[2])
+            if hull_contents(1, r) != -1 or hull_contents(3, r) != -1:
+                best = min(best, k - 1)
+                break
+    return best
+
+
 def free_spot(p):
-    """nudge a player-sized entity out of walls (hull 1 and 3 must be empty)"""
+    """place a player-sized entity so it is in open space with some clearance to walls.
+    A spawn exactly on a clip plane counts as inside the wall for the engine's float math."""
     def ok(q):
-        return hull_contents(1, q) == -1 and hull_contents(3, q) == -1
-    if ok(p):
+        if hull_contents(1, q) != -1 or hull_contents(3, q) != -1:
+            return False
+        # must have a floor right below (origin is 36 above the feet); no spawning in mid-air
+        return any(hull_contents(1, (q[0], q[1], q[2] - k)) == -2 for k in (4, 8, 16, 24, 32, 40))
+    if ok(p) and clearance(p) >= MARGIN:
         return p, False
-    best = None
+    best = None  # (clearance, -distance, q)
     for dz in (0, 4, 8, 12, 16):
-        for dx in range(-32, 33, 2):
-            for dy in range(-32, 33, 2):
+        for dx in range(-48, 49, 2):
+            for dy in range(-48, 49, 2):
                 q = (p[0] + dx, p[1] + dy, p[2] + dz)
+                if not ok(q):
+                    continue
                 dd = dx * dx + dy * dy + dz * dz
-                if ok(q) and (best is None or dd < best[0]):
-                    best = (dd, q)
+                c = min(clearance(q), MARGIN)
+                cand = (c, -dd, q)
+                if best is None or cand > best:
+                    best = cand
+        if best and best[0] >= 4:
+            break
     if best is None:
         print("  WARNING: no free spot near", p)
         return p, False
-    return best[1], True
+    if best[0] < 2:
+        print("  WARNING: only %d units of clearance at" % best[0], best[2])
+    return best[2], True
 
 
 moved = []
@@ -352,7 +379,7 @@ def fix_block(m):
         if feet:
             q, did = free_spot(q)
             if did:
-                moved.append((cls, v, q))
+                moved.append((cls, v, q, 'clearance %d' % clearance(q)))
         elif cls in FLOOR:
             q2, did = free_spot((q[0], q[1], q[2] + 36))
             if did:
