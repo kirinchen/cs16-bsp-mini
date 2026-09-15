@@ -86,4 +86,6 @@ A passage of width W and height H is standing-passable at scale s when
 - Plane count: only referenced planes are kept and deduplicated (engine limit 32767).
 - Clipnode order: every node of a hull must have an index >= its head node, or the game
   dies with `PM_HullPointContents: bad node number`. `bspcheck.py` verifies this.
-- Spawns are moved out of walls automatically; hostages keep their floor-level origin.
+- Spawns are moved out of walls automatically, to a spot with a floor below and up to 8 units
+  of clearance; a spawn placed exactly on a clip plane is 'stuck' in-game even though a
+  point test says it is free. Hostages keep their floor-level origin.

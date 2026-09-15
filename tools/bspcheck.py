@@ -7,6 +7,7 @@ Checks:
   * clipnode ordering the engine enforces (no node index below its hull's head node)
   * every player spawn sits in empty space in the standing (hull 1) and crouching (hull 3) hulls
   * 40 units below every spawn is solid (i.e. there is a floor)
+  * no spawn sits within 2 units of a wall (a spawn on a clip plane counts as stuck in-game)
 Optional: extra "x y z" triples are probed in hull 1 / hull 3 of the scaled map and their
 contents printed (-1 empty, -2 solid, -3 water).
 """
@@ -79,6 +80,17 @@ def check_clip_order(B):
     return bad
 
 
+def clearance(B, p, cap=8):
+    """distance (capped) to the nearest solid in +-x / +-y for a standing player"""
+    best = cap
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for k in range(1, cap + 1):
+            if contents(B, 1, (p[0] + dx * k, p[1] + dy * k, p[2])) != -1:
+                best = min(best, k - 1)
+                break
+    return best
+
+
 def spawns(B):
     out = []
     for blk in re.findall(r'\{([^}]*)\}', B['ents']):
@@ -100,6 +112,9 @@ def main():
         below = {contents(B, 1, (p[0], p[1], p[2] - 40)) for p in sp}
         ok = h1 == {-1} and h3 == {-1} and below == {-2}
         print(f"{name}: {len(sp)} spawns  hull1={h1} hull3={h3} floor-below={below}  {'OK' if ok else 'PROBLEM'}")
+        tight = [(p, clearance(B, p)) for p in sp if clearance(B, p) < 2]
+        if tight:
+            print(f"   {len(tight)} spawn(s) within 2 units of a wall (engine may treat as stuck): {tight}")
     extra = [float(x) for x in sys.argv[3:]]
     for i in range(0, len(extra) - 2, 3):
         p = tuple(extra[i:i + 3])
