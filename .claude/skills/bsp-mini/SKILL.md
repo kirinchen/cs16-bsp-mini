@@ -75,7 +75,9 @@ are rescaled, lightmaps and visibility are reused unchanged.
 A passage of width W and height H is standing-passable at scale s when
 `W*s > 32` and `H*s > 72`; crouch-passable when `H*s > 36`. Two more hard limits on open
 maps: floor-to-sky height times s must exceed 72, and the spacing between neighbouring
-spawn points times s must exceed 32, or players spawn inside each other.
+spawn points times s must exceed 64: CS treats a spawn with another player within 64
+units as occupied and stacks players once every spot is occupied. If the scaled spacing
+is below 64, re-space the spawns with `tools/bspents.py IN OUT line CLASS X Z Y0 Y1`.
 
 To strip floor weapons or other point entities: `--drop=armoury_entity`.
 
