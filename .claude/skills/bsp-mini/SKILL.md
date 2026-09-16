@@ -73,7 +73,11 @@ are rescaled, lightmaps and visibility are reused unchanged.
 | jump | ~45 (crouch-jump ~63) | |
 
 A passage of width W and height H is standing-passable at scale s when
-`W*s > 32` and `H*s > 72`; crouch-passable when `H*s > 36`.
+`W*s > 32` and `H*s > 72`; crouch-passable when `H*s > 36`. Two more hard limits on open
+maps: floor-to-sky height times s must exceed 72, and the spacing between neighbouring
+spawn points times s must exceed 32, or players spawn inside each other.
+
+To strip floor weapons or other point entities: `--drop=armoury_entity`.
 
 ## Report format
 

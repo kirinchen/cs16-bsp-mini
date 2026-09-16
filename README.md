@@ -13,6 +13,7 @@ GoldSrc engine map (Half-Life, TFC, Day of Defeat) as well.
 | de_survivor | 7/16 | yes |
 | de_airstrip | 9/16 | yes |
 | cs_assault | XY 5/8, Z 13/16 | yes (vents need crouch, as in the original) |
+| awp_map | 5/16 | yes (limits: sky height 304 > 72 and spawn spacing 124 > 32) |
 
 Everything shrinks together: geometry, collision hulls, textures, entity positions.
 Lighting and visibility are reused from the original compile, so the result looks like the
@@ -44,7 +45,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 
 | tool | purpose |
 |---|---|
-| `tools/bspscale.py IN OUT SX SY SZ` | the scaler |
+| `tools/bspscale.py IN OUT SX SY SZ [--drop=class,class]` | the scaler; `--drop` removes point entities by classname (e.g. `armoury_entity` to strip floor weapons) |
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
 | `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |

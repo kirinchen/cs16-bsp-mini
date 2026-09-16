@@ -8,6 +8,11 @@ from collections import OrderedDict
 src, dst = sys.argv[1], sys.argv[2]
 SX, SY, SZ = (float(x) for x in sys.argv[3:6])
 S = (SX, SY, SZ)
+# optional: --drop classname[,classname...]  remove point entities of these classes
+DROP = set()
+for a in sys.argv[6:]:
+    if a.startswith('--drop='):
+        DROP |= set(a[7:].split(','))
 d = open(src, 'rb').read()
 ver, = struct.unpack_from('<i', d, 0)
 assert ver == 30, "not a GoldSrc v30 BSP"
@@ -361,6 +366,7 @@ def free_spot(p):
 
 
 moved = []
+dropped = []
 
 
 def fix_block(m):
@@ -368,6 +374,9 @@ def fix_block(m):
     pairs = re.findall(r'"([^"]*)" "([^"]*)"', body)
     kv = dict(pairs)
     cls = kv.get('classname', '')
+    if cls in DROP:
+        dropped.append(cls)
+        return ''
 
     def sc(v, feet=False):
         try:
@@ -409,6 +418,7 @@ def fix_block(m):
 
 
 new_ents = re.sub(r'\{([^}]*)\}', fix_block, ents).encode('latin1') + b'\0'
+print("entities dropped:", len(dropped), sorted(set(dropped)))
 print("entities nudged out of walls:", len(moved))
 for mv in moved:
     print("  ", mv)
