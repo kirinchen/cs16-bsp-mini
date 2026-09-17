@@ -1,0 +1,155 @@
+<title>Blood Strike × AWP 拼接圖</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f5f4ef;
+    --ink: #1f2430;
+    --muted: #6b7180;
+    --line: #c9c6bb;
+    --panel: #ffffff;
+    --floor: #ece9e0;
+    --arena-floor: #e4e7ee;
+    --wall: #3b4252;
+    --box1: #cfcabb;
+    --box2: #b3ad9a;
+    --box3: #8f8873;
+    --ct: #2f6fb0;
+    --t: #c8801a;
+    --seam: #d64545;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171a21; --ink: #e6e4dc; --muted: #9aa0ad; --line: #3a3f4c; --panel: #1f2330;
+      --floor: #2a2e39; --arena-floor: #262c3a; --wall: #b9bfcc;
+      --box1: #4a4f5c; --box2: #6a7080; --box3: #8f96a8;
+      --ct: #6ea3e0; --t: #e0a45a; --seam: #ef6b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171a21; --ink: #e6e4dc; --muted: #9aa0ad; --line: #3a3f4c; --panel: #1f2330;
+    --floor: #2a2e39; --arena-floor: #262c3a; --wall: #b9bfcc;
+    --box1: #4a4f5c; --box2: #6a7080; --box3: #8f96a8;
+    --ct: #6ea3e0; --t: #e0a45a; --seam: #ef6b6b;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; padding-block: 28px 48px; padding-inline: 20px; line-height: 1.55; }
+  main { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 0 0 22px; max-width: 64ch; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 8px; }
+  figure h2 { font-size: 1rem; margin: 0; }
+  svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 0.86rem; color: var(--muted); }
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 0.86rem; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 14px; border-radius: 2px; display: inline-block; border: 1px solid var(--line); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  td:first-child { color: var(--muted); white-space: nowrap; }
+  .note { font-size: 0.9rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+  .note b { font-weight: 600; }
+</style>
+
+<main>
+  <h1>Blood Strike 切半，AWP 區拉寬填滿中間，交界留牆</h1>
+  <p class="sub">俯視圖，按真實尺寸繪製。AWP 迷你區先轉 90°，再把方塊位置拉開到 1696 寬對齊 Blood Strike 地板（方塊本身維持 70×70）。兩條交界各留一段 848 寬、128 高的牆擋住中線，兩側各留 424 的通道，出生時不會直接對視。出生點沿用 Blood Strike 原本的 10 v 10。</p>
+
+  <div class="grid">
+    <figure>
+      <h2>拼接後的整張圖，1696 × 2816</h2>
+      <div id="fig"></div>
+      <figcaption>上為 T 側、下為 CT 側。紅色實線是交界處保留的牆（848 寬、128 高），兩側各開 424 寬通道；虛線段是純地板交界。</figcaption>
+    </figure>
+
+    <div class="side">
+      <div class="legend">
+        <span><i class="sw" style="background:var(--floor)"></i> Blood Strike 地板</span>
+        <span><i class="sw" style="background:var(--arena-floor)"></i> AWP 區地板</span>
+        <span><i class="sw" style="background:var(--box1)"></i><i class="sw" style="background:var(--box2)"></i><i class="sw" style="background:var(--box3)"></i> 掩體，越深越高</span>
+        <span><i class="sw" style="background:var(--wall)"></i> 外牆</span>
+        <span><i class="sw" style="background:var(--seam)"></i> 交界牆（新造）</span>
+        <span><i class="dot" style="background:var(--ct)"></i> CT 出生 ×10</span>
+        <span><i class="dot" style="background:var(--t)"></i> T 出生 ×10</span>
+      </div>
+
+      <table>
+        <thead><tr><th>段</th><th>尺寸</th><th>來源</th></tr></thead>
+        <tbody>
+          <tr><td>上半</td><td class="mono">1696 × 848</td><td>cs_bloodstirke y ≥ 0 的部分，往上推 560</td></tr>
+          <tr><td>中段</td><td class="mono">1696 × 1120</td><td>awp_map_mini 轉 90°，方塊位置 x 方向 ×2.12（800 → 1696），方塊大小與長度不變</td></tr>
+          <tr><td>交界牆</td><td class="mono">848 × 16 × 128</td><td>新造，各在 y = ±560 的中段，兩側通道各 424 寬</td></tr>
+          <tr><td>下半</td><td class="mono">1696 × 848</td><td>cs_bloodstirke y ≤ 0 的部分，往下推 560</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <b>視野：</b>交界牆擋住中線，出生區之間沒有直線通視。要對狙得先走到兩側 424 寬的通道口，通道口就是狙擊點。AWP 區的方塊在中線附近提供第二層掩護。
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var HALF_W = 848, HALF_D = 848, AR_L = 560, WALL = 16, SX = 1696 / 800;
+  var bsFeat = [
+    [-832,-832,-448,-720, 1], [448,-832,832,-720, 1],
+    [-832,-720,-384,-704, 3], [384,-720,832,-704, 3],
+    [-400,-704,-384,-576, 2], [384,-704,400,-576, 2],
+    [-832,-128,-640,-96, 2], [640,-128,832,-96, 2],
+    [-544,-368,-448,-344, 2], [448,-368,544,-344, 2]
+  ];
+  var ctSpawn = [[0,-768],[128,-768],[-128,-640],[-64,-704],[64,-704],[-192,-704],[192,-704],[-128,-768],[0,-640],[128,-640]];
+  var arBox = [
+    [-30,360,40,430,1], [-98,-348,-28,-278,1],
+    [-230,170,-160,240,2], [145,-216,215,-146,2],
+    [-75,-70,-5,0,2],
+    [170,250,240,320,3], [-262,-190,-192,-120,3]
+  ];
+  var PAD = 70, W = 2*HALF_W + 2*PAD, TOP = HALF_D + AR_L, H = 2*TOP + 2*PAD;
+  function X(x){ return x + HALF_W + PAD; }
+  function Y(y){ return TOP - y + PAD; }
+  function txt(x,y,t,fill,size,anchor){ return '<text x="'+X(x)+'" y="'+Y(y)+'" font-size="'+(size||44)+'" fill="'+(fill||'currentColor')+'" text-anchor="'+(anchor||'middle')+'" font-family="IBM Plex Sans, Noto Sans TC, sans-serif">'+t+'</text>'; }
+  function rect(x0,y0,x1,y1,fill){ return '<rect x="'+X(x0)+'" y="'+Y(y1)+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="'+fill+'"/>'; }
+  var lv = {1:'var(--box1)',2:'var(--box2)',3:'var(--box3)'};
+  var s = '';
+  s += rect(-HALF_W, -TOP, HALF_W, -AR_L, 'var(--floor)');
+  s += rect(-HALF_W, AR_L, HALF_W, TOP, 'var(--floor)');
+  s += rect(-HALF_W, -AR_L, HALF_W, AR_L, 'var(--arena-floor)');
+  bsFeat.forEach(function(f){
+    s += rect(f[0], f[1]-AR_L, f[2], f[3]-AR_L, lv[f[4]]);
+    s += rect(f[0], -f[3]+AR_L, f[2], -f[1]+AR_L, lv[f[4]]);
+  });
+  arBox.forEach(function(b){ var cx=(b[0]+b[2])/2*SX, hw=(b[2]-b[0])/2; s += rect(cx-hw, b[1], cx+hw, b[3], lv[b[4]]); });
+  var w = WALL;
+  s += rect(-HALF_W-w, -TOP-w, HALF_W+w, -TOP, 'var(--wall)');
+  s += rect(-HALF_W-w, TOP, HALF_W+w, TOP+w, 'var(--wall)');
+  s += rect(-HALF_W-w, -TOP, -HALF_W, TOP, 'var(--wall)');
+  s += rect(HALF_W, -TOP, HALF_W+w, TOP, 'var(--wall)');
+  [AR_L, -AR_L].forEach(function(y){
+    s += '<line x1="'+X(-HALF_W)+'" y1="'+Y(y)+'" x2="'+X(HALF_W)+'" y2="'+Y(y)+'" stroke="var(--seam)" stroke-width="4" stroke-dasharray="28 20"/>';
+    s += rect(-424, y-8, 424, y+8, 'var(--seam)');
+    s += txt(-636, y+30, '通道 424', 'var(--seam)', 34);
+    s += txt(636, y+30, '通道 424', 'var(--seam)', 34);
+  });
+  ctSpawn.forEach(function(p){
+    s += '<circle cx="'+X(p[0])+'" cy="'+Y(p[1]-AR_L)+'" r="14" fill="var(--ct)"/>';
+    s += '<circle cx="'+X(p[0])+'" cy="'+Y(-p[1]+AR_L)+'" r="14" fill="var(--t)"/>';
+  });
+  s += txt(0, TOP-60, 'T 出生區', 'var(--t)', 48);
+  s += txt(0, -TOP+30, 'CT 出生區', 'var(--ct)', 48);
+  s += txt(0, 480, 'AWP 區（位置拉寬到 1696）', 'currentColor', 48);
+  s += txt(-HALF_W+30, AR_L+380, 'Blood Strike 上半', 'var(--muted)', 40, 'start');
+  s += txt(-HALF_W+30, -AR_L-410, 'Blood Strike 下半', 'var(--muted)', 40, 'start');
+  s += '<line x1="'+X(HALF_W+40)+'" y1="'+Y(AR_L)+'" x2="'+X(HALF_W+40)+'" y2="'+Y(-AR_L)+'" stroke="currentColor" stroke-width="3"/>';
+  s += txt(HALF_W+56, 0, '1120', 'currentColor', 38, 'start');
+  s += '<line x1="'+X(-HALF_W)+'" y1="'+Y(-TOP-50)+'" x2="'+X(HALF_W)+'" y2="'+Y(-TOP-50)+'" stroke="currentColor" stroke-width="3"/>';
+  s += txt(0, -TOP-105, '1696', 'currentColor', 38);
+  document.getElementById('fig').innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="拼接後的俯視圖：上為 T 側的 Blood Strike 半張，中間是拉寬到 1696 的 AWP 區，下為 CT 側半張，三段之間沒有牆。">'+s+'</svg>';
+})();
+</script>

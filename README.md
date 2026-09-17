@@ -48,6 +48,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 | `tools/bspscale.py IN OUT SX SY SZ [--drop=class,class]` | the scaler; `--drop` removes point entities by classname (e.g. `armoury_entity` to strip floor weapons) |
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
 | `tools/bspents.py MAP dump [class]` / `IN OUT line CLASS X Z Y0 Y1` | inspect entities, or re-space all spawns of a class evenly along a line (CS refuses a spawn with another player within 64 units, so shrunken spawn rows need re-spacing) |
+| `tools/bspdecomp.py MAP.bsp OUT.map [wads]` | decompile an axis-aligned map to a Valve-220 .map (exact round trip on box maps); also a library for building .map files from code |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
 | `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |
 | `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, every spawn in open air with a floor below, optional point probes |
@@ -92,3 +93,12 @@ exists in the game code (weapon ranges, fall damage).
 ## License
 
 MIT. Map files are not included; they belong to Valve.
+
+## Beyond scaling: cut, splice, recompile
+
+`bspdecomp.py` turns an axis-aligned map back into brushes, so maps can be cut and spliced
+in code and recompiled with [sdHLT](https://github.com/seedee/SDHLT).
+`examples/awp_bloodstrike/merge_build.py` cuts cs_bloodstirke at y=0, pushes the halves
+apart and fills the gap with awp_map_mini's octagonal cover, seam walls blocking the centre
+line. Round trip check: decompile + recompile of cs_bloodstirke reproduces the same
+reachable space and the same per-texture face area as the original.
