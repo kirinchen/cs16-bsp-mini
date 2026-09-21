@@ -160,6 +160,22 @@ class Map:
                         q.append(n)
         return dist
 
+    def clearance(self, p, cap=8):
+        """distance (capped) to the nearest wall around a standing origin. A probe counts as a
+        wall only if it is solid both at the origin height and 18 units higher, so a ramp or a
+        step next to the spot (which the engine walks up) is not mistaken for a wall."""
+        best = cap
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            for k in range(1, cap + 1):
+                q = (p[0] + dx * k, p[1] + dy * k, p[2])
+                q2 = (q[0], q[1], q[2] + 18)
+                low = self.contents(1, q) != -1 or self.contents(3, q) != -1 or self.in_brush_model(1, q)
+                high = self.contents(1, q2) != -1 or self.in_brush_model(1, q2)
+                if low and high:
+                    best = min(best, k - 1)
+                    break
+        return best
+
     def connected(self, seen, p):
         sp = self.near_spot(p)
         if sp is None:

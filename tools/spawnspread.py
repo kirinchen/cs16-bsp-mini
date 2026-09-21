@@ -35,14 +35,7 @@ if not existing:
 
 
 def clearance(p):
-    best = MARGIN
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        for k in range(1, MARGIN + 1):
-            q = (p[0] + dx * k, p[1] + dy * k, p[2])
-            if M.contents(1, q) != -1 or M.contents(3, q) != -1 or M.in_brush_model(1, q):
-                best = min(best, k - 1)
-                break
-    return best
+    return M.clearance(p, MARGIN)
 
 
 starts = [M.near_spot(p) for p in existing]

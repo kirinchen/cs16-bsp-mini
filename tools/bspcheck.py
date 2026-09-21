@@ -81,11 +81,14 @@ def check_clip_order(B):
 
 
 def clearance(B, p, cap=8):
-    """distance (capped) to the nearest solid in +-x / +-y for a standing player"""
+    """distance (capped) to the nearest wall in +-x / +-y for a standing player. A probe is a
+    wall only if solid both at the origin height and 18 units higher, so ramps and steps next
+    to the spot (which the engine walks up) do not count."""
     best = cap
     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         for k in range(1, cap + 1):
-            if contents(B, 1, (p[0] + dx * k, p[1] + dy * k, p[2])) != -1:
+            q = (p[0] + dx * k, p[1] + dy * k, p[2])
+            if contents(B, 1, q) != -1 and contents(B, 1, (q[0], q[1], q[2] + 18)) != -1:
                 best = min(best, k - 1)
                 break
     return best
