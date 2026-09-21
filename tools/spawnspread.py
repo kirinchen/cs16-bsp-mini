@@ -43,12 +43,28 @@ def kv(b):
     return dict(re.findall(r'"([^"]*)" "([^"]*)"', b))
 
 
-def contents(hull, p):
-    n = models[0][9 + hull]
+SOLID_CLS = {'func_wall', 'func_breakable', 'func_door', 'func_door_rotating', 'func_button', 'func_train',
+             'func_tracktrain', 'func_pushable'}
+solid_models = [int(kv(b)['model'][1:]) for b in blocks
+                if kv(b).get('classname') in SOLID_CLS and kv(b).get('model', '').startswith('*')]
+
+
+def contents(hull, p, model=0):
+    n = models[model][9 + hull]
     while n >= 0:
         pl = planes[clip[n][0]]
         n = clip[n][1] if pl[0] * p[0] + pl[1] * p[1] + pl[2] * p[2] - pl[3] >= 0 else clip[n][2]
     return n
+
+
+def in_brush_model(hull, p):
+    """solid brush entities (walls, crates, doors) are separate models; test them too"""
+    for m in solid_models:
+        mm = models[m]
+        if mm[0] - 40 <= p[0] <= mm[3] + 40 and mm[1] - 40 <= p[1] <= mm[4] + 40 and mm[2] - 80 <= p[2] <= mm[5] + 80:
+            if contents(hull, p, m) == -2:
+                return True
+    return False
 
 
 def segs(hull, x, y, z0, z1):
@@ -84,9 +100,9 @@ ZMIN, ZMAX = models[0][2] - 64, models[0][5] + 64
 
 
 def spots(cx, cy):
-    """standing origins (z) at grid cell"""
+    """standing origins (z) at grid cell, excluding spots inside solid brush entities"""
     x, y = cx * G, cy * G
-    return [a + 36 for a, b in segs(1, x, y, ZMIN, ZMAX) if b - a > 1]
+    return [a + 36 for a, b in segs(1, x, y, ZMIN, ZMAX) if b - a > 1 and not in_brush_model(1, (x, y, a + 36))]
 
 
 def clearance(p):
@@ -94,7 +110,7 @@ def clearance(p):
     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         for k in range(1, MARGIN + 1):
             q = (p[0] + dx * k, p[1] + dy * k, p[2])
-            if contents(1, q) != -1 or contents(3, q) != -1:
+            if contents(1, q) != -1 or contents(3, q) != -1 or in_brush_model(1, q):
                 best = min(best, k - 1)
                 break
     return best
@@ -119,7 +135,12 @@ while q:
         continue
     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         for z2 in spots(cx + dx, cy + dy):
-            if z2 - cz <= 45 + 36 and cz - z2 <= 200:  # step/jump up, drop down
+            if abs(z2 - cz) <= 45:  # must be walkable both ways: no drop-only ledges
+                # the straight path between the two cells must be free too (no hopping thin rails)
+                zi = max(cz, z2)
+                if any(contents(1, (cx * G + dx * k, cy * G + dy * k, zi)) != -1 or
+                       in_brush_model(1, (cx * G + dx * k, cy * G + dy * k, zi)) for k in (4, 8, 12)):
+                    continue
                 key = (cx + dx, cy + dy, z2)
                 nd = dcur + G
                 if key not in dist or nd < dist[key]:
@@ -129,7 +150,7 @@ while q:
 cands = []
 for (cx, cy, z), dd in dist.items():
     p = (cx * G, cy * G, z)
-    if contents(1, p) != -1 or contents(3, p) != -1:
+    if contents(1, p) != -1 or contents(3, p) != -1 or in_brush_model(1, p) or in_brush_model(3, p):
         continue
     if not any(contents(1, (p[0], p[1], p[2] - k)) == -2 for k in (4, 8, 16, 24, 32, 40)):
         continue
