@@ -70,7 +70,7 @@ def ok(p):
 
 kept = 0
 for p in existing:
-    if ok(p) and len(chosen) < want:
+    if ok(p) and len(chosen) < want and clearance(p) >= 4:  # originals too close to a wall are replaced
         chosen.append(p)
         kept += 1
 for dd, p in cands:
