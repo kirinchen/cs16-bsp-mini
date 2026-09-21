@@ -77,7 +77,8 @@ A passage of width W and height H is standing-passable at scale s when
 maps: floor-to-sky height times s must exceed 72, and the spacing between neighbouring
 spawn points times s must exceed 64: CS treats a spawn with another player within 64
 units as occupied and stacks players once every spot is occupied. If the scaled spacing
-is below 64, re-space the spawns with `tools/bspents.py IN OUT line CLASS X Z Y0 Y1`.
+is below 64, fix it with `tools/spawnspread.py IN OUT CLASS WANT` (keeps well-spaced originals, adds
+spots on walkable ground near the zone) or, for a single row, `tools/bspents.py ... line`.
 
 To strip floor weapons or other point entities: `--drop=armoury_entity`.
 

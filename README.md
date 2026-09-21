@@ -47,6 +47,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 |---|---|
 | `tools/bspscale.py IN OUT SX SY SZ [--drop=class,class]` | the scaler; `--drop` removes point entities by classname (e.g. `armoury_entity` to strip floor weapons) |
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
+| `tools/spawnspread.py IN OUT CLASS WANT [MIN_DIST] [REACH]` | keep or add spawn points of a team so that WANT of them exist with no two closer than MIN_DIST (default 72), placed on walkable ground near the existing spawn zone |
 | `tools/bspents.py MAP dump [class]` / `IN OUT line CLASS X Z Y0 Y1` | inspect entities, or re-space all spawns of a class evenly along a line (CS refuses a spawn with another player within 64 units, so shrunken spawn rows need re-spacing) |
 | `tools/bspdecomp.py MAP.bsp OUT.map [wads]` | decompile an axis-aligned map to a Valve-220 .map (exact round trip on box maps); also a library for building .map files from code |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
