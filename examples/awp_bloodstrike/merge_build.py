@@ -48,9 +48,12 @@ for bx in boxes:
         if abs(y0) < 0.5:
             bx = expose(bx, 'y-')
         bs_brushes.append(box_brush(shifted(bx, GAP)))
-    else:  # crosses the cut: two pieces, cut faces hidden
+    else:  # crosses the cut: two pieces; the new cut faces get a wall texture (the compiler
+           # drops any that end up hidden behind the arena's floor, ceiling or side walls)
         lo = dict(bx); lo['max'] = (bx['max'][0], 0.0, bx['max'][2]); lo['tex'] = dict(bx['tex']); lo['tex']['y+'] = None
         hi = dict(bx); hi['min'] = (bx['min'][0], 0.0, bx['min'][2]); hi['tex'] = dict(bx['tex']); hi['tex']['y-'] = None
+        lo = expose(lo, 'y+')
+        hi = expose(hi, 'y-')
         bs_brushes.append(box_brush(shifted(lo, -GAP)))
         bs_brushes.append(box_brush(shifted(hi, GAP)))
 
