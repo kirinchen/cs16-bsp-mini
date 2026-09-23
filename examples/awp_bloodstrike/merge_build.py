@@ -144,9 +144,10 @@ for e in ents:
         y += -GAP if y < 0 else GAP
         e['origin'] = '%g %g %g' % (x, y, z)
     out_ents.append(e)
-for x in (-420, 420):
-    for y in (-370, 0, 370):
-        out_ents.append({'classname': 'light', 'origin': '%d %d -240' % (x, y), '_light': '168 168 168 200'})
+# arena lighting: 4 x 4 grid just under the ceiling, brighter than blood strike's 200
+for x in (-636, -212, 212, 636):
+    for y in (-420, -140, 140, 420):
+        out_ents.append({'classname': 'light', 'origin': '%d %d -160' % (x, y), '_light': '210 210 200 260'})
 worldspawn = {
     'classname': 'worldspawn', 'mapversion': '220', 'MaxRange': '4096',
     'message': 'Blood Strike x AWP mini',
