@@ -24,12 +24,29 @@ def shifted(box, dy):
     b['max'] = (box['max'][0], box['max'][1] + dy, box['max'][2])
     return b
 
+wall_default = next(b['tex']['x+'] for b in boxes if abs(b["max"][0] + 832) < 0.5 and b['tex'].get('x+'))
+
+
+def expose(bx, side):
+    """a face on the cut plane was hidden by the mirrored half; now it faces the arena"""
+    if bx['tex'].get(side) is None:
+        bx = dict(bx)
+        bx['tex'] = dict(bx['tex'])
+        alt = next((bx['tex'][k] for k in ('x-', 'x+', 'y-', 'y+') if bx['tex'].get(k)), wall_default)
+        bx['tex'][side] = (alt[0], None, None)
+    return bx
+
+
 bs_brushes = []
 for bx in boxes:
     y0, y1 = bx['min'][1], bx['max'][1]
     if y1 <= 0:
+        if abs(y1) < 0.5:
+            bx = expose(bx, 'y+')
         bs_brushes.append(box_brush(shifted(bx, -GAP)))
     elif y0 >= 0:
+        if abs(y0) < 0.5:
+            bx = expose(bx, 'y-')
         bs_brushes.append(box_brush(shifted(bx, GAP)))
     else:  # crosses the cut: two pieces, cut faces hidden
         lo = dict(bx); lo['max'] = (bx['max'][0], 0.0, bx['max'][2]); lo['tex'] = dict(bx['tex']); lo['tex']['y+'] = None
@@ -53,10 +70,8 @@ mid.append(aabb((-XW, -GAP, CEIL_BOT), (XW, GAP, CEIL_TOP), {'z-': ceil_ti}))
 mid.append(aabb((-XW, -GAP, FLOOR_TOP), (-832.0, GAP, CEIL_BOT), {'x+': wall_ti}))
 mid.append(aabb((832.0, -GAP, FLOOR_TOP), (XW, GAP, CEIL_BOT), {'x-': (wall_ti[0], None, None)}))
 # seam walls: centre 848 wide, 16 thick, 128 high, at both joints
-SW = ('wet_wall06', None, None)
-for yc in (GAP, -GAP):
-    mid.append(aabb((-SEAM_HALF, yc - SEAM_T / 2, FLOOR_TOP), (SEAM_HALF, yc + SEAM_T / 2, FLOOR_TOP + SEAM_H),
-                    {'x-': SW, 'x+': SW, 'y-': SW, 'y+': SW, 'z+': SW}))
+# (no extra seam walls: blood strike's own full-height centre block, x -448..448, is now the
+#  wall at each joint; the passages are the original side corridors)
 
 # ---- awp cover boxes: top-face polygons of awp_map_mini, rotated 90deg, positions stretched ----
 A = load(AWP)
