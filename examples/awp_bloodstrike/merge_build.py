@@ -127,6 +127,9 @@ for cl in clusters:
     cx = sum(p[0] for p in poly) / len(poly)
     poly = [(p[0] + cx * (STRETCH - 1), p[1]) for p in poly]          # stretch positions, keep shape
     h = cl['z'] - floor_mini
+    # the 5/16 scale left the pillars 20..70 high, useless as cover: raise them so the two low
+    # ones hide a crouching player (36) and the tall ones a standing one (72)
+    h = {20: 48, 30: 64, 50: 96, 70: 128}.get(round(h), h * 2)
     mid.append(poly_brush(poly, FLOOR_TOP, FLOOR_TOP + h, 'c2a4_lasgun', cl['name']))
     nboxes += 1
     print("  box h=%g at (%.0f, %.0f) %d sides" % (h, cx * STRETCH, cl['c'][1], len(poly)))
