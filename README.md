@@ -104,3 +104,8 @@ in code and recompiled with [sdHLT](https://github.com/seedee/SDHLT).
 apart and fills the gap with awp_map_mini's octagonal cover, seam walls blocking the centre
 line. Round trip check: decompile + recompile of cs_bloodstirke reproduces the same
 reachable space and the same per-texture face area as the original.
+
+## Engine rules, verified
+
+The three engine behaviours the tools depend on were checked in the shipped `hw.dll` and
+`mp.dll` with REA + Ghidra: see `docs/engine-rules-verified-with-rea.md`.
