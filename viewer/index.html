@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BSP viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --fg: #d8dee6; --dim: #7d8794; --accent: #f5c542; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 30%, #1c222b 0%, #0d1014 70%); color: var(--fg);
+    font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  canvas { display: block; outline: none; }
+  #hud { position: fixed; left: 10px; top: 10px; pointer-events: none; padding: 7px 11px; border-radius: 6px; background: #0d1014b8; }
+  #hud .name { font-weight: 600; font-size: 14px; letter-spacing: .02em; }
+  #hud .stats, #hud .keys { color: var(--dim); font-size: 12px; }
+  #hud .keys { margin-top: 2px; opacity: .8; }
+  #bar { position: fixed; right: 12px; top: 10px; display: flex; gap: 6px; }
+  #bar button { background: #1b2129cc; color: var(--fg); border: 1px solid #2c3540; border-radius: 6px; padding: 5px 10px;
+    font: inherit; font-size: 12px; cursor: pointer; }
+  #bar button:hover { border-color: #4a5868; }
+  #toast { position: fixed; right: 14px; bottom: 14px; max-width: min(760px, calc(100vw - 28px)); background: #12161bf2; border: 1px solid #2c3540;
+    border-left: 3px solid var(--accent); border-radius: 6px; padding: 9px 12px; box-shadow: 0 6px 24px #0008;
+    opacity: 0; transform: translateY(8px); transition: opacity .18s, transform .18s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: none; }
+  #toast .title { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+  #toast .body { font: 12px/1.45 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; word-break: break-all; }
+  #empty { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; color: var(--dim); }
+  #empty div { border: 1px dashed #364150; border-radius: 10px; padding: 28px 40px; text-align: center; }
+  body.dragging #empty { display: flex !important; }
+  body.dragging #empty div { border-color: var(--accent); color: var(--fg); }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud"><div class="name"></div><div class="stats"></div><div class="keys">drag look · WASD move · Q/E down/up · Shift fast · wheel speed · click pick · R reload</div></div>
+<div id="bar"><button id="open">Open .bsp</button><button id="reload" title="Reload (R)">Reload</button></div>
+<div id="empty"><div>Drop a .bsp here, click <b>Open .bsp</b>, or use <code>?map=path/to/map.bsp</code></div></div>
+<div id="toast"><div class="title"></div><div class="body"></div></div>
+<input id="file" type="file" accept=".bsp" hidden>
+<script type="module" src="main.js"></script>
+</body>
+</html>

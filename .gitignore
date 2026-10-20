@@ -3,3 +3,5 @@
 *.wad
 __pycache__/
 *.pyc
+viewer/maps
+viewer/scratch

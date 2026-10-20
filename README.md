@@ -49,6 +49,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 | `tools/reach.py MAP [grid] [stand]` | BFS a player-sized box from T spawn to CT spawn and objectives using the map's own collision hulls; reports what is reachable standing / crouching |
 | `tools/spawnspread.py IN OUT CLASS WANT [MIN_BOX] [REACH]` | keep or add spawn points of a team so that WANT of them exist with a spot-to-player-box distance of at least MIN_BOX (default 80; the engine refuses a spot with a player box within 64), placed on walkable ground near the existing spawn zone |
 | `tools/reachlib.py` | the walkability model shared by reach.py and spawnspread.py |
+| `tools/bspmove.py MAP ENT DX DY DZ [OUT]` | move one entity (index #n as in `bspents.py dump` and the 3D viewer's locator) by an offset; only its `origin` key changes, every other byte stays |
 | `tools/bspents.py MAP dump [class]` / `IN OUT line CLASS X Z Y0 Y1` | inspect entities, or re-space all spawns of a class evenly along a line (CS refuses a spawn with another player within 64 units, so shrunken spawn rows need re-spacing) |
 | `tools/bspdecomp.py MAP.bsp OUT.map [wads]` | decompile an axis-aligned map to a Valve-220 .map (exact round trip on box maps); also a library for building .map files from code |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
@@ -79,6 +80,57 @@ Direct BSP v30 lump surgery:
 
 Not handled: lightmap resampling (not needed with this approach) and anything that only
 exists in the game code (weapon ranges, fall damage).
+
+## 3D viewer
+
+`viewer/` is a static browser preview and picker for BSP v30 files (three.js from a pinned CDN
+URL, no build step). Click a spawn or a wall and it copies a one-line *locator* you can paste to
+an agent ("move this spawn back 64"); the agent edits the BSP with the tools above and you press
+**R** to see the result.
+
+```sh
+ln -s /path/to/your/maps viewer/maps   # gitignored; the server only sees files under the repo
+python3 -m http.server 8000          # from the repo root
+# open http://localhost:8000/viewer/?map=maps/de_aztec_mini.bsp
+```
+
+Or open `http://localhost:8000/viewer/` and drop a .bsp on the page / use **Open .bsp** (reload
+only works for `?map=`). `?cam=x,y,z,yaw,pitch` sets the start camera (**P** copies the current one).
+
+| input | action |
+|---|---|
+| drag | look around |
+| W A S D | move; Q / E down / up; Shift faster; wheel changes speed |
+| click | pick a face or entity marker, copy its locator, show it in the corner |
+| R / Reload | re-fetch the same URL (cache-busted), keep the camera and selected entity |
+| Esc | clear the selection |
+
+Drawn: the world and non-trigger brush entities, shaded with the map's own lightmaps times a
+colour hashed from the texture name (or the embedded texture when the BSP carries its pixels;
+WAD textures are not loaded). Tool textures (`sky`, `aaatrigger`, `clip`, `origin`, `null`, ...) are
+skipped. Markers: CT spawns blue, T spawns red, bomb targets, `armoury_entity`, hostages, and
+labelled buy zone / bomb site / rescue volumes.
+
+Locator formats (always GoldSrc coordinates, Z up; `#n` is the entity's index in the entity lump,
+0 = worldspawn, the same order `bspents.py MAP dump` prints):
+
+```
+map=cs_assault_mini.bsp | pos=(-430, 1264.3, 127.4) | face=951 | tex=generic77 | model=0 | normal=(1,0,0)
+map=de_aztec_mini.bsp | entity=info_player_start#175 | origin=(-1420, 180, -210) | angles=0 0 0
+```
+
+A face on a brush entity adds `entity=func_door#12`; a zone label adds `model=*N` and its
+`mins` / `maxs`. Typical follow-up: `python3 tools/bspmove.py MAP.bsp 175 -64 0 0`.
+
+`node viewer/test/parse.mjs MAP.bsp ...` cross-checks the JS parser against the Python tools
+(face / model / entity counts, entity order, spawn origins).
+
+**Limits.** Editing a compiled BSP can move or retarget entities, change texture names and
+scale the whole map; it cannot "add a wall here". New geometry changes the BSP tree, the
+collision hulls, visibility and the lightmaps, so it needs a recompile (see *Beyond scaling*
+below). Moving a point entity is safe, but nothing re-checks gameplay rules: run
+`tools/bspcheck.py` to make sure a moved spawn is not inside a wall, and keep spawns 64+ units
+apart.
 
 ## Claude Code skill
 
