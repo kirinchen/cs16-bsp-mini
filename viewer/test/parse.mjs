@@ -19,7 +19,7 @@ function py(code) {
   return execFileSync('python3', ['-c', code], { cwd: tools, encoding: 'utf8', maxBuffer: 64 << 20 });
 }
 
-for (const map of process.argv.slice(2)) {
+for (const map of process.argv.slice(2).map((m) => path.resolve(m))) {
   console.log('==', path.basename(map));
   const buf = readFileSync(map);
   const bsp = parseBSP(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));

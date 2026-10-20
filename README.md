@@ -90,6 +90,7 @@ an agent ("move this spawn back 64"); the agent edits the BSP with the tools abo
 
 ```sh
 ln -s /path/to/your/maps viewer/maps   # gitignored; the server only sees files under the repo
+#   Windows: mklink /J viewer\maps C:\path\to\your\maps
 python3 -m http.server 8000          # from the repo root
 # open http://localhost:8000/viewer/?map=maps/de_aztec_mini.bsp
 ```
