@@ -1,8 +1,9 @@
 """Build awp_bloodstrike.map: cs_bloodstirke cut at y=0, halves pushed apart by 560 each way,
 the gap filled with a 1696-wide arena carrying awp_map_mini's cover boxes, seam walls in the
 middle of each joint. usage: python merge_build.py OUT.map"""
+import os
 import sys, math, struct
-sys.path.insert(0, r'C:\Users\DDT\Desktop\projects\cs16-bsp-mini\tools')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'tools'))
 from bspdecomp import decompile, load, face_pts, box_brush, poly_brush, write_map
 
 HL = r'C:/Program Files (x86)/Steam/steamapps/common/Half-Life'

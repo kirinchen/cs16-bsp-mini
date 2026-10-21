@@ -1,4 +1,11 @@
-# cs16-bsp-mini
+# goldsrc-agent-kit
+
+Edit compiled GoldSrc maps (Counter-Strike 1.6, Half-Life, TFC, DoD) by talking to an AI agent:
+shrink a whole map, move spawns, check collision, preview and pick in 3D in the browser.
+The agent works on the compiled `.bsp` directly; every engine rule the tools rely on is
+checked in the shipped binaries (see *Engine rules, verified*). Formerly `cs16-bsp-mini`.
+
+## Shrinking a map
 
 Shrink a compiled Counter-Strike 1.6 map (`.bsp`) into a playable "mini" version
 **without decompiling or recompiling**. Pure Python 3, no dependencies. Works on any
