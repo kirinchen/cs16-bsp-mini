@@ -93,7 +93,9 @@ To strip floor weapons or other point entities: `--drop=armoury_entity`.
 ## Gotchas the tools already handle (do not re-solve)
 
 - Clip hulls: the per-hull Minkowski expansion is removed, scaled, and re-added so the
-  player does not sink into floors. Never just scale clipnode plane distances.
+  player does not sink into floors. Never just scale clipnode plane distances. The expansion
+  side is detected per clipnode (portal vote) and brushes that poke through split planes after
+  scaling are re-inserted; `bspcheck.py` reports any wall a player could still sink into.
 - Lightmaps: texture vectors are inverse-scaled and nudged per face so lightmap extents
   are bit-identical to what the original compiler wrote (inferred from the lighting lump).
 - Plane count: only referenced planes are kept and deduplicated (engine limit 32767).

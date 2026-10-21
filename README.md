@@ -54,7 +54,7 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 | `tools/bspdecomp.py MAP.bsp OUT.map [wads]` | decompile an axis-aligned map to a Valve-220 .map (exact round trip on box maps); also a library for building .map files from code |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
 | `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |
-| `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, every spawn in open air with a floor below, optional point probes |
+| `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, clipnode order, every spawn in open air with a floor below, **hull-vs-wall check** (a player centre 8 units in front of every visible wall must be solid in hull 1 and 3, otherwise players sink into that wall), optional point probes |
 | `tools/bspinfo.py MAP...` | lumps, bounds, entity classes, texture list |
 | `tools/ents.py MAP...` | spawn / objective coordinates |
 | `tools/measure.py MAP REGEX` | sizes of faces whose texture name matches (measure doors, vents) |
@@ -72,9 +72,17 @@ Direct BSP v30 lump surgery:
 - **Clip hulls** are the tricky part. GoldSrc stores collision as planes already expanded by
   the player's half-size. Scaling those distances directly would shrink the expansion and let
   the player sink 18 units into the floor. The scaler subtracts the per-hull Minkowski
-  expansion, scales, and adds it back, per hull. Subtrees the compiler shared between hulls
-  are split per hull and written in pre-order, because the engine refuses any clipnode whose
-  index is below its hull's head node (`PM_HullPointContents: bad node number`).
+  expansion, scales, and adds it back, per hull. Which *way* a plane was expanded is not stored
+  (normals are canonical, so a wall with its solid on the plane's front side is stored as
+  `d - e`, one with the solid behind as `d + e`): the scaler finds the solid side of every
+  clipnode by clipping the node's portal polygon down both child subtrees and voting by area.
+  Getting this wrong cancels the expansion at scale 1/2 and lets players stand half inside
+  walls (454 of 2291 wall faces on the first de_aztec_mini). Scaling also shrinks the gaps
+  between brushes but not the expansion, so a scaled brush can poke through a split plane it
+  used to stay clear of; those slivers are re-inserted into the far subtree as convex brushes
+  (deepest first, up to the engine's 32767-clipnode limit). Subtrees the compiler shared
+  between hulls are split per hull and written in pre-order, because the engine refuses any
+  clipnode whose index is below its hull's head node (`PM_HullPointContents: bad node number`).
 - **Entities**: `MaxRange`, door `lip`, `func_tracktrain` wheels/speed, `bombradius`,
   `env_explosion` magnitude are scaled. Everything else is left alone.
 
@@ -160,5 +168,5 @@ reachable space and the same per-texture face area as the original.
 
 ## Engine rules, verified
 
-The three engine behaviours the tools depend on were checked in the shipped `hw.dll` and
+The four engine behaviours the tools depend on were checked in the shipped `hw.dll` and
 `mp.dll` with REA + Ghidra: see `docs/engine-rules-verified-with-rea.md`.

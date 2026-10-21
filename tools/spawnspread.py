@@ -26,6 +26,8 @@ src, dst, cls, want = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
 MIN_BOX = float(sys.argv[5]) if len(sys.argv) > 5 else 80.0
 REACH = float(sys.argv[6]) if len(sys.argv) > 6 else 640.0
 MARGIN = 8
+LIFT = 8      # origin this far above the hull-1 floor plane, like Valve's own spawns; a spawn written exactly on
+              # the plane rounds into the floor (bspcheck: hull1 = -2) and the engine treats it as stuck
 
 M = Map(src, hulls=((1, 36),))          # standing only: a spawn must be a standing spot
 existing_ents = [e for e in M.ents if e.get('classname') == cls]
@@ -44,7 +46,7 @@ cands = []
 for (cx, cy, fz, h), dd in dist.items():
     if dd > REACH or h != 1:
         continue
-    p = (cx * M.G, cy * M.G, fz + 36)
+    p = (cx * M.G, cy * M.G, fz + 36 + LIFT)
     if M.contents(1, p) != -1 or M.contents(3, p) != -1 or M.in_brush_model(1, p) or M.in_brush_model(3, p):
         continue
     if not any(M.contents(1, (p[0], p[1], p[2] - k)) == -2 for k in (4, 8, 16, 24, 32, 40)):

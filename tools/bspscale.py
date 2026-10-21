@@ -2,7 +2,7 @@
 Textures shrink with the geometry so the lightmap lump is reused unchanged.
 usage: python bspscale.py in.bsp out.bsp SX SY SZ
 """
-import struct, sys, math, re
+import struct, sys, math, re, os
 from collections import OrderedDict
 
 src, dst = sys.argv[1], sys.argv[2]
@@ -102,15 +102,152 @@ copy_memo = {}        # (tree, old index) -> new index
 plane_memo = {}
 
 
-def hull_plane(h, pidx):
-    key = (h, pidx)
+# ---------- which way was each clipnode's plane expanded? ----------
+# The compiler expanded every brush face outward by expand(n, hull) along the FACE normal, but the
+# plane lump stores canonical normals: the stored dist is d+e when the solid lies on the plane's back
+# side and d-e when it lies on the front. Undoing the expansion therefore needs the solid side, per
+# node (one plane index can be the expanded face of two different brushes in two regions). We find it
+# by sampling the node's portal polygon (its plane clipped by every ancestor) just in front of / behind
+# the plane and asking the two child subtrees what they contain.
+def _dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _contents_from(node, pt):
+    n = node
+    while n >= 0:
+        pl = planes[clipnodes[n][0]]
+        n = clipnodes[n][1] if _dot(pl, pt) - pl[3] >= 0 else clipnodes[n][2]
+    return n
+
+
+def _clip_poly(poly, n, dist, keep_front):
+    out = []
+    for i in range(len(poly)):
+        a, b = poly[i], poly[(i + 1) % len(poly)]
+        da, db = _dot(n, a) - dist, _dot(n, b) - dist
+        if not keep_front:
+            da, db = -da, -db
+        if da >= 0:
+            out.append(a)
+        if (da >= 0) != (db >= 0):
+            t = da / (da - db)
+            out.append(tuple(a[k] + t * (b[k] - a[k]) for k in range(3)))
+    return out
+
+
+def _area(poly):
+    sx = sy = sz = 0.0
+    for i in range(len(poly)):
+        a, b = poly[i], poly[(i + 1) % len(poly)]
+        sx += a[1] * b[2] - a[2] * b[1]; sy += a[2] * b[0] - a[0] * b[2]; sz += a[0] * b[1] - a[1] * b[0]
+    return 0.5 * math.sqrt(sx * sx + sy * sy + sz * sz)
+
+
+def _fragments(node, poly):
+    """push a polygon down a clipnode subtree: yields (leaf contents, fragment) for every leaf it crosses"""
+    stack = [(node, poly)]
+    while stack:
+        n, p = stack.pop()
+        if n < 0:
+            yield n, p
+            continue
+        pl = planes[clipnodes[n][0]]
+        nn = tuple(pl[:3])
+        f = _clip_poly(p, nn, pl[3], True)
+        if len(f) >= 3:
+            stack.append((clipnodes[n][1], f))
+        b = _clip_poly(p, nn, pl[3], False)
+        if len(b) >= 3:
+            stack.append((clipnodes[n][2], b))
+
+
+node_votes = {}     # old clipnode index -> votes (debug: BSPSCALE_SIGNDUMP=file.json)
+node_sign = {}      # old clipnode index -> +1 (solid behind: stored dist = d + e) / -1 (solid in front)
+sign_stats = {'back': 0, 'front': 0, 'interior': 0, 'unresolved': 0}
+_BIG = 65536.0
+_EPS = 0.5
+
+
+def _classify(node, ancestors, bbox):
+    stack = [(node, ancestors)]
+    while stack:
+        node, ancestors = stack.pop()
+        if node < 0 or node in node_sign:
+            continue
+        pi, c0, c1 = clipnodes[node]
+        n = tuple(planes[pi][:3]); dist = planes[pi][3]
+        o = tuple(n[k] * dist for k in range(3))
+        a = (1.0, 0.0, 0.0) if abs(n[0]) < 0.9 else (0.0, 1.0, 0.0)
+        u = (n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0])
+        lu = math.sqrt(_dot(u, u)); u = (u[0] / lu, u[1] / lu, u[2] / lu)
+        v = (n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0])
+        poly = [tuple(o[k] + s * _BIG * u[k] + t * _BIG * v[k] for k in range(3))
+                for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        for (an, ad, front) in list(bbox) + ancestors:     # the model's box first: outside it is all solid
+            poly = _clip_poly(poly, an, ad, front)
+            if len(poly) < 3:
+                break
+        # exact portal fragments instead of point samples: a bevel plane of a slanted brush is a real face of
+        # the expanded hull but only one hull width wide, which a sample grid over the whole portal can miss
+        votes = {'front': 0.0, 'back': 0.0, 'solid': 0.0}
+        if len(poly) >= 3:
+            up = [tuple(q[k] + _EPS * n[k] for k in range(3)) for q in poly]
+            for cf, frag in _fragments(c0, up):
+                down = [tuple(q[k] - 2 * _EPS * n[k] for k in range(3)) for q in frag]
+                for cb, sub in _fragments(c1, down):
+                    f, b = cf != -1, cb != -1
+                    if f != b:
+                        votes['front' if f else 'back'] += _area(sub)
+                    elif f:
+                        votes['solid'] += _area(sub)
+        node_votes[node] = votes
+        if votes['front'] or votes['back']:
+            node_sign[node] = 1 if votes['back'] >= votes['front'] else -1
+            sign_stats['back' if node_sign[node] > 0 else 'front'] += 1
+        else:
+            node_sign[node] = 1          # inside solid, or no brush fragment on this portal: direction is moot
+            sign_stats['solid' in votes and votes['solid'] and 'interior' or 'unresolved'] += 1
+        stack.append((c1, ancestors + [(n, dist, False)]))
+        stack.append((c0, ancestors + [(n, dist, True)]))
+
+
+for m in models:
+    for h in (1, 2, 3):
+        pad = max(HULLS[h]) + 8.0
+        box = []
+        for k in range(3):
+            n = [0.0, 0.0, 0.0]; n[k] = 1.0
+            box.append((tuple(n), m[k] - pad, True))        # keep x >= mins - pad
+            box.append((tuple(n), m[3 + k] + pad, False))   # keep x <= maxs + pad
+        _classify(m[9 + h], [], box)
+print("clip plane expansion side:", sign_stats)
+if os.environ.get('BSPSCALE_SIGNDUMP'):
+    import json
+    json.dump({str(k): v for k, v in node_votes.items()}, open(os.environ['BSPSCALE_SIGNDUMP'], 'w'))
+
+
+def hull_plane(h, pidx, sign):
+    """undo the compiler's hull expansion (sign * expand), scale the bare plane, expand again"""
+    key = (h, pidx, sign)
     if key not in plane_memo:
         nx, ny, nz, dist, t = planes[pidx]
         n0 = (nx, ny, nz)
-        d0 = dist - expand(n0, HULLS[h])
+        d0 = dist - sign * expand(n0, HULLS[h])
         n2, d0s = xform_plane(n0, d0)
-        plane_memo[key] = add_plane(n2, d0s + expand(n2, HULLS[h]))
+        plane_memo[key] = add_plane(n2, d0s + sign * expand(n2, HULLS[h]))
     return plane_memo[key]
+
+
+def hull_dist(h, pidx, sign):
+    nx, ny, nz, dist, t = planes[pidx]
+    n0 = (nx, ny, nz)
+    n2, d0s = xform_plane(n0, dist - sign * expand(n0, HULLS[h]))
+    return d0s + sign * expand(n2, HULLS[h])
+
+
+node_old = {}
+node_other = {}     # new clipnode index -> where its plane would sit with the opposite expansion sign
 
 
 def copy_clip(tree, h, idx):
@@ -126,13 +263,256 @@ def copy_clip(tree, h, idx):
     new_clip.append(None)
     copy_memo[key] = ni
     pn, c0, c1 = clipnodes[idx]
-    new_clip[ni] = [hull_plane(h, pn), copy_clip(tree, h, c0), copy_clip(tree, h, c1)]
+    new_clip[ni] = [hull_plane(h, pn, node_sign[idx]), copy_clip(tree, h, c0), copy_clip(tree, h, c1)]
+    node_other[ni] = hull_dist(h, pn, -node_sign[idx])
+    node_old[ni] = (idx, h)
     return ni
 
 
 for mi, m in enumerate(models):
     for h in (1, 2, 3):
         m[9 + h] = copy_clip((mi, h), h, m[9 + h])
+# ---------- sliver repair ----------
+# Scaling shrinks the gaps between brushes but not the hull expansion, so a scaled expanded brush can
+# poke through a split plane it stayed clear of in the original (bound: e * (1 - s) each side, plus
+# the same again when the plane itself was expanded the other way). The subtree on the far side knows
+# nothing about that brush, so a player there sinks into it. Along every node plane, the band between
+# the two candidate positions (d_chosen, d_other) is where this can happen: solid fragments of the
+# near child that reach into the band are re-inserted into the far child as convex brushes.
+_TINY = 0.05
+
+
+def _poly_cap(pts, n):
+    """order coplanar points (normal n) into a convex polygon, dropping duplicates"""
+    uniq = []
+    for q in pts:
+        if not any(abs(q[0] - r[0]) + abs(q[1] - r[1]) + abs(q[2] - r[2]) < 1e-3 for r in uniq):
+            uniq.append(q)
+    if len(uniq) < 3:
+        return []
+    c = tuple(sum(q[k] for q in uniq) / len(uniq) for k in range(3))
+    a = (1.0, 0.0, 0.0) if abs(n[0]) < 0.9 else (0.0, 1.0, 0.0)
+    u = (n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0])
+    v = (n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0])
+    uniq.sort(key=lambda q: math.atan2(_dot(v, (q[0] - c[0], q[1] - c[1], q[2] - c[2])),
+                                       _dot(u, (q[0] - c[0], q[1] - c[1], q[2] - c[2]))))
+    return uniq
+
+
+def _clip_polytope(faces, n, d, keep_front):
+    """convex polytope (list of face polygons) clipped by a plane; returns (faces, cap polygon)"""
+    out, on = [], []
+    for f in faces:
+        g = _clip_poly(f, n, d, keep_front)
+        if len(g) >= 3 and _area(g) > 1e-6:
+            out.append(g)
+            on.extend(q for q in g if abs(_dot(n, q) - d) < 1e-4)
+    cap = _poly_cap(on, n)
+    if len(cap) >= 3 and _area(cap) > 1e-6:
+        out.append(cap)
+    return out, cap
+
+
+def _box_polytope(lo, hi):
+    x0, y0, z0 = lo
+    x1, y1, z1 = hi
+    P = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    return [[P[i] for i in f] for f in ((0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (2, 3, 7, 6), (1, 2, 6, 5), (0, 3, 7, 4))]
+
+
+def _extent(faces):
+    pts = [q for f in faces for q in f]
+    return min(max(q[k] for q in pts) - min(q[k] for q in pts) for k in range(3)) if pts else 0.0
+
+
+def _vol(faces):
+    """volume of a convex polytope: sum of pyramids from an interior point to each face"""
+    pts = [q for f in faces for q in f]
+    if len(faces) < 4 or not pts:
+        return 0.0
+    c = tuple(sum(q[k] for q in pts) / len(pts) for k in range(3))
+    v = 0.0
+    for f in faces:
+        nx = ny = nz = 0.0
+        for i in range(len(f)):
+            a, b = f[i], f[(i + 1) % len(f)]
+            nx += (a[1] - b[1]) * (a[2] + b[2])
+            ny += (a[2] - b[2]) * (a[0] + b[0])
+            nz += (a[0] - b[0]) * (a[1] + b[1])
+        ln = math.sqrt(nx * nx + ny * ny + nz * nz)     # = 2 * area
+        if ln < 1e-9:
+            continue
+        h = abs((nx * (f[0][0] - c[0]) + ny * (f[0][1] - c[1]) + nz * (f[0][2] - c[2])) / ln)
+        v += ln * 0.5 * h / 3.0
+    return v
+
+
+_MINVOL = 0.5
+_MINDEPTH = 2.0     # a brush poking less than this through a split plane is not worth clipnodes
+
+
+def _newplane(i):
+    r = new_planes[i]
+    return (r[0], r[1], r[2]), r[3]
+
+
+def _push_new(node, poly):
+    """polygon down the NEW tree: yields (leaf, fragment, path of (plane index, side))"""
+    stack = [(node, poly, [])]
+    while stack:
+        n, p, path = stack.pop()
+        if n < 0:
+            yield n, p, path
+            continue
+        pi = new_clip[n][0]
+        nn, d = _newplane(pi)
+        f = _clip_poly(p, nn, d, True)
+        if len(f) >= 3:
+            stack.append((new_clip[n][1], f, path + [(pi, True)]))
+        b = _clip_poly(p, nn, d, False)
+        if len(b) >= 3:
+            stack.append((new_clip[n][2], b, path + [(pi, False)]))
+
+
+repair_stats = {'nodes': 0, 'brushes': 0, 'clipnodes': 0}
+pending = []        # (priority, -depth, node, child slot, polytope, contents) collected before any insertion
+
+
+def _insert(node, Q, contents, skip=()):
+    """insert convex solid Q (contents) into the new subtree at node; returns the (possibly new) root.
+    skip: faces of Q that are boundaries of the leaf being descended into (they need no chain plane)"""
+    if node >= 0:
+        nn, d = _newplane(new_clip[node][0])
+        f, cap = _clip_polytope(Q, nn, d, True)
+        if _vol(f) > _MINVOL:
+            new_clip[node][1] = _insert(new_clip[node][1], f, contents, skip + ((nn, d),))
+        b, cap = _clip_polytope(Q, nn, d, False)
+        if _vol(b) > _MINVOL:
+            new_clip[node][2] = _insert(new_clip[node][2], b, contents, skip + ((nn, d),))
+        return node
+    if not (node == -1 or (contents == -2 and node != -2)):
+        return node
+    # brush chain: outside any face -> the old leaf, inside all faces -> contents
+    c = [0.0, 0.0, 0.0]
+    cnt = 0
+    for f in Q:
+        for q in f:
+            c = [c[k] + q[k] for k in range(3)]
+            cnt += 1
+    c = [v / cnt for v in c]
+    chain = []
+    for f in Q:
+        nx = ny = nz = 0.0           # Newell normal
+        for i in range(len(f)):
+            a, b = f[i], f[(i + 1) % len(f)]
+            nx += (a[1] - b[1]) * (a[2] + b[2])
+            ny += (a[2] - b[2]) * (a[0] + b[0])
+            nz += (a[0] - b[0]) * (a[1] + b[1])
+        ln = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if ln < 1e-6:
+            continue
+        n = (nx / ln, ny / ln, nz / ln)
+        if _dot(n, c) > _dot(n, f[0]):      # make it point away from the centroid
+            n = (-n[0], -n[1], -n[2])
+        d = _dot(n, f[0])
+        same = lambda m, e: abs(_dot(m, n) - 1.0) < 1e-6 and abs(e - d) < 1e-3
+        if any(same(m, e) or same((-m[0], -m[1], -m[2]), -e) for m, e in skip):
+            continue        # the leaf already ends here
+        if any(same(m, e) for m, e in chain):
+            continue
+        chain.append((n, d))
+    if not chain:
+        return contents if node == -1 else node
+    head = contents
+    for n, d in reversed(chain):
+        ni = len(new_clip)
+        # the engine evaluates axial planes as p[type] - dist, so an axial normal must be positive:
+        # store the flipped plane and swap the children
+        if max(n) < 0.5 and min(n) < -0.5:
+            new_clip.append([add_plane((-n[0], -n[1], -n[2]), -d), head, node])   # front = inside
+        else:
+            new_clip.append([add_plane(n, d), node, head])     # front (outside) -> old leaf, back -> inside
+        head = ni
+    repair_stats['brushes'] += 1
+    repair_stats['clipnodes'] += len(chain)
+    return head
+
+
+def _repair(root, region, h):
+    stack = [(root, region)]
+    while stack:
+        ni, R = stack.pop()
+        if ni < 0 or ni not in node_other:
+            continue
+        pi, c0, c1 = new_clip[ni]
+        n, d = _newplane(pi)
+        d_o = node_other[ni]
+        front_R, cap = _clip_polytope(R, n, d, True)
+        back_R, _ = _clip_polytope(R, n, d, False)
+        if abs(d - d_o) > 1e-3 and len(cap) >= 3:
+            if d_o < d:     # plane sits at the front bound: the front child's solids may reach down to d_o
+                band, _ = _clip_polytope(back_R, n, d_o, True)
+                src, dst_slot, eps = c0, 2, _EPS
+            else:
+                band, _ = _clip_polytope(front_R, n, d_o, False)
+                src, dst_slot, eps = c1, 1, -_EPS
+            DBG = os.environ.get('BSPSCALE_DEBUG') and node_old.get(ni) == (int(os.environ['BSPSCALE_DEBUG']), int(os.environ.get('BSPSCALE_DEBUG_HULL', 1)))
+            if DBG:
+                print('DBG node', ni, 'old', node_old[ni], 'n', n, 'd', d, 'd_o', d_o, 'cap', len(cap), 'band faces', len(band), 'extent', _extent(band))
+            if _vol(band) > _MINVOL:
+                probe = [tuple(q[k] + eps * n[k] for k in range(3)) for q in cap]
+                for leaf, frag, path in _push_new(src, probe):
+                    if leaf == -1:
+                        continue
+                    if DBG:
+                        bb = [(min(q[k] for q in frag), max(q[k] for q in frag)) for k in range(3)]
+                        print('  frag leaf', leaf, 'area', round(_area(frag), 1), 'bbox', [(round(a), round(b)) for a, b in bb])
+                    Q = band
+                    for ppi, side in path:
+                        pn, pd = _newplane(ppi)
+                        dp = _dot(pn, n)
+                        # a duplicate of this node's own plane deeper in the child: in the original tree it
+                        # bounded the fragment at the parent, so it must not cut the band
+                        if (dp > 0.9999 and abs(pd - d) < 0.01) or (dp < -0.9999 and abs(pd + d) < 0.01):
+                            continue
+                        Q, _ = _clip_polytope(Q, pn, pd, side)
+                        if len(Q) < 4:
+                            break
+                    if DBG:
+                        print('    Q faces', len(Q), 'vol', round(_vol(Q), 3))
+                    depth = max(_dot(n, q) for f in Q for q in f) - min(_dot(n, q) for f in Q for q in f) if Q else 0.0
+                    if _vol(Q) > _MINVOL and depth >= _MINDEPTH:
+                        pending.append((0 if h != 2 else 1, -depth, ni, dst_slot, Q, leaf))
+        stack.append((new_clip[ni][2], back_R))
+        stack.append((new_clip[ni][1], front_R))
+
+
+for h in (1, 2, 3):
+    for m in models:
+        pad = max(HULLS[h]) + 8.0
+        lo = [m[k] * S[k] - pad for k in range(3)]
+        hi = [m[3 + k] * S[k] + pad for k in range(3)]
+        _repair(m[9 + h], _box_polytope(lo, hi), h)
+# hulls 1 (standing) and 3 (crouching) are what CS players walk with, so they go first, deepest crossing
+# first; hull 2 (32x32x32, large monsters) last. Insertion stops at the engine's clipnode limit.
+pending.sort(key=lambda t: t[:2])
+_LIMIT = 32767
+skipped = 0
+touched = set()
+for prio, ndepth, ni, dst_slot, Q, leaf in pending:
+    if skipped:
+        skipped += 1
+        continue
+    snap = [row[:] for row in new_clip] if len(new_clip) > _LIMIT - 400 else None
+    new_clip[ni][dst_slot] = _insert(new_clip[ni][dst_slot], Q, leaf)
+    touched.add(ni)
+    if len(new_clip) > _LIMIT:
+        new_clip[:] = snap
+        skipped = 1
+repair_stats['nodes'] = len(touched)
+if skipped:
+    print("WARNING: clipnode limit %d reached: %d of %d sliver brushes not inserted (shallowest, hull 2 first)" % (_LIMIT, skipped, len(pending)))
+print("sliver repair: nodes", repair_stats['nodes'], "brushes", repair_stats['brushes'], "of", len(pending), "clipnodes added", repair_stats['clipnodes'])
 assert len(new_clip) <= 32767, "too many clipnodes after per-hull split"
 for m in models:
     for h in (1, 2, 3):

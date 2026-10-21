@@ -8,6 +8,9 @@ Checks:
   * every player spawn sits in empty space in the standing (hull 1) and crouching (hull 3) hulls
   * 40 units below every spawn is solid (i.e. there is a floor)
   * no spawn sits within 2 units of a wall (a spawn on a clip plane counts as stuck in-game)
+  * collision matches the picture: 8 units in front of every visible wall face the standing and
+    crouching hulls are solid (a player's half-width is 16, so an empty hull there lets him stand
+    half inside the wall). This is the check that caught the clip-plane expansion sign bug.
 Optional: extra "x y z" triples are probed in hull 1 / hull 3 of the scaled map and their
 contents printed (-1 empty, -2 solid, -3 water).
 """
@@ -32,6 +35,10 @@ def load(path):
     }
     o, l = L[0]
     B['ents'] = d[o:o + l].decode('latin1')
+    o, l = L[2]
+    ntex = struct.unpack_from('<i', d, o)[0]
+    offs = struct.unpack_from('<%di' % ntex, d, o + 4)
+    B['texnames'] = [d[o + t:o + t + 16].split(b'\0')[0].decode('latin1').lower() if t > 0 else '' for t in offs]
     return B
 
 
@@ -94,6 +101,46 @@ def clearance(B, p, cap=8):
     return best
 
 
+def contents0(B, p):
+    """point hull (the drawn geometry): leaf contents"""
+    n = B['models'][0][9]
+    while n >= 0:
+        pl = B['planes'][B['nodes'][n][0]]
+        n = B['nodes'][n][1] if pl[0] * p[0] + pl[1] * p[1] + pl[2] * p[2] - pl[3] >= 0 else B['nodes'][n][2]
+    return B['leaves'][-1 - n][0]
+
+
+TOOL_TEX = ('sky', 'aaatrigger', 'clip', 'origin', 'null', 'hint', 'skip', '{', '!')
+
+
+def check_hull_walls(B, D=8.0):
+    """world wall faces (|nz| <= 0.7, open air in front) where a player centre D units out is NOT
+    solid in hull 1 or hull 3: returns (faces tested, list of offenders)"""
+    m0 = B['models'][0]
+    tested, bad = 0, []
+    for fi in range(m0[14], m0[14] + m0[15]):
+        f = B['faces'][fi]
+        if B['texnames'][B['texinfo'][f[4]][8]].startswith(TOOL_TEX):
+            continue
+        nx, ny, nz, dist, _ = B['planes'][f[0]]
+        if f[1]:
+            nx, ny, nz = -nx, -ny, -nz
+        if abs(nz) > 0.7:
+            continue
+        pts = []
+        for k in range(f[2], f[2] + f[3]):
+            e = B['surfedges'][k][0]
+            pts.append(B['verts'][B['edges'][e][0] if e >= 0 else B['edges'][-e][1]])
+        c = [sum(q[i] for q in pts) / len(pts) for i in range(3)]
+        out = (c[0] + nx * D, c[1] + ny * D, c[2] + nz * D)
+        if contents0(B, out) != -1:
+            continue
+        tested += 1
+        if contents(B, 1, out) == -1 or contents(B, 3, out) == -1:
+            bad.append((fi, tuple(round(x, 1) for x in c)))
+    return tested, bad
+
+
 def spawns(B):
     out = []
     for blk in re.findall(r'\{([^}]*)\}', B['ents']):
@@ -118,6 +165,10 @@ def main():
         tight = [(p, clearance(B, p)) for p in sp if clearance(B, p) < 2]
         if tight:
             print(f"   {len(tight)} spawn(s) within 2 units of a wall (engine may treat as stuck): {tight}")
+    for name, B in (("orig", A), ("scaled", M)):
+        tested, bad = check_hull_walls(B)
+        print(f"{name}: hull1/hull3 empty 8 units in front of a visible wall: {len(bad)} of {tested} faces"
+              f"{'  OK' if not bad else '  PROBLEM (player can stand half inside the wall), e.g. ' + str(bad[:3])}")
     extra = [float(x) for x in sys.argv[3:]]
     for i in range(0, len(extra) - 2, 3):
         p = tuple(extra[i:i + 3])
