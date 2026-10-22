@@ -183,10 +183,7 @@ def fmt(v):
     return ('%.6f' % v).rstrip('0').rstrip('.') if abs(v - round(v)) > 1e-9 else '%d' % round(v)
 
 
-def write_map(path, worldspawn, brushes, ents):
-    out = ['{']
-    for k, v in worldspawn.items():
-        out.append('"%s" "%s"' % (k, v))
+def _write_brushes(out, brushes):
     for br in brushes:
         out.append('{')
         for n, p, ti in br:
@@ -196,13 +193,23 @@ def write_map(path, worldspawn, brushes, ents):
                 fmt(p0[0]), fmt(p0[1]), fmt(p0[2]), fmt(p1[0]), fmt(p1[1]), fmt(p1[2]), fmt(p2[0]), fmt(p2[1]), fmt(p2[2]),
                 ti[0], fmt(u[0]), fmt(u[1]), fmt(u[2]), fmt(uo), fmt(v[0]), fmt(v[1]), fmt(v[2]), fmt(vo), fmt(sx), fmt(sy)))
         out.append('}')
+
+
+def write_map(path, worldspawn, brushes, ents):
+    """ents may carry '__brushes' (a list of brushes) to be written as a brush entity"""
+    out = ['{']
+    for k, v in worldspawn.items():
+        out.append('"%s" "%s"' % (k, v))
+    _write_brushes(out, brushes)
     out.append('}')
     for e in ents:
         if e.get('classname') == 'worldspawn':
             continue
         out.append('{')
         for k, v in e.items():
-            out.append('"%s" "%s"' % (k, v))
+            if k != '__brushes':
+                out.append('"%s" "%s"' % (k, v))
+        _write_brushes(out, e.get('__brushes', ()))
         out.append('}')
     open(path, 'w', newline='\n').write('\n'.join(out) + '\n')
 

@@ -59,6 +59,10 @@ allowed (`SX SY SZ`), useful for maps with low doorways.
 | `tools/bspmove.py MAP ENT DX DY DZ [OUT]` | move one entity (index #n as in `bspents.py dump` and the 3D viewer's locator) by an offset; only its `origin` key changes, every other byte stays |
 | `tools/bspents.py MAP dump [class]` / `IN OUT line CLASS X Z Y0 Y1` | inspect entities, or re-space all spawns of a class evenly along a line (CS refuses a spawn with another player within 64 units, so shrunken spawn rows need re-spacing) |
 | `tools/bspdecomp.py MAP.bsp OUT.map [wads]` | decompile an axis-aligned map to a Valve-220 .map (exact round trip on box maps); also a library for building .map files from code |
+| `tools/bsp2map.py MAP.bsp OUT.map [wads]` | decompile any map (slopes, bevels, brush entities): every solid / sky leaf of hull 0 becomes one brush, split where the drawn faces change texture |
+| `tools/bspwad.py MAP.bsp OUT.wad` | write the textures embedded in a BSP to a WAD3, so a decompiled map can be recompiled (`sdHLCSG -wadinclude`) |
+| `tools/bspclipmerge.py NEW.bsp ORIG.bsp OUT.bsp [mask.json]` | put the original map's player clipping (hulls 1-3, lost by any decompile) back into a recompiled map, except inside a mask where the edit opened space |
+| `tools/bspgraft.py TARGET.bsp DONOR.bsp OUT.bsp` | add new geometry to a map without recompiling it: brush entities compiled in a small donor map (faces, lightmaps, player hulls) are appended to the target; everything already in the target stays byte-identical |
 | `tools/navscale.py IN.nav OUT.nav SX SY SZ [scaled.bsp]` | scale a CS 1.6 bot navigation mesh (v5) to match the scaled map; keeps connections, hiding spots, place names |
 | `tools/reachdiff.py stand.json crouch.json grid sx sy sz` | cluster the cells reachable only crouching and print them in original-map coordinates, so you can see which doorway or ceiling forces the crouch |
 | `tools/bspcheck.py ORIG SCALED [x y z ...]` | index-range check, clipnode order, every spawn in open air with a floor below, **hull-vs-wall check** (a player centre 8 units in front of every visible wall must be solid in hull 1 and 3, otherwise players sink into that wall), optional point probes |
@@ -172,6 +176,23 @@ in code and recompiled with [sdHLT](https://github.com/seedee/SDHLT).
 apart and fills the gap with awp_map_mini's octagonal cover, seam walls blocking the centre
 line. Round trip check: decompile + recompile of cs_bloodstirke reproduces the same
 reachable space and the same per-texture face area as the original.
+
+`bsp2map.py` does the same for maps with slopes. `examples/dust2_roofs/` lifts de_dust2's sky
+off the rooftops (the sky is a thin slab laid directly on the buildings), adds seven flights of
+stairs and puts HE grenades on the roofs. Clip brushes exist only in the player hulls, so a
+decompile loses them; `bspclipmerge.py` merges the original hulls 1 and 3 back in, masked by a
+heightfield that only lets go of clipping under the old sky and above jumping height. Round trip
+of de_dust2 without edits: per-texture visible area within 3% of the original; with the clip
+merged back, nothing becomes reachable from T spawn that was not before, and 192 of 41,119
+reachable cells (0.5%) are lost.
+
+When a full recompile changes too much of the look, add geometry by grafting instead:
+`examples/dust2_mini_roofs/` puts six flights of stairs (compiled alone as `func_wall`s) and HE
+grenades into the community map de_dust2_mini without touching any of its own faces, lightmaps or
+clipping. Each flight was walked in game (scripted `+forward`, a grenade on the top tread to prove
+the player got there). Lessons from that test: the second tread must stay under the 18-unit step
+height for a player stepping on from the side, and a low arch over the foot of a flight stops the
+player even when the hull math says the path is clear.
 
 ## Engine rules, verified
 
