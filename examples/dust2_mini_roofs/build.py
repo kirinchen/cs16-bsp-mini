@@ -32,7 +32,10 @@ SIDE = ('SandTrim', None, None)
 # (a low arch over the foot stopped the player in game): (name, top cell x, y, street z, roof z,
 # toward wall, up[, tread run])
 FLIGHTS = [
-    ('t_spawn', 1216, -2448, -592, -480, (0, 1), (1, 0), 20),     # shorter treads: a pillar stands 8 units past a 24-run flight's foot
+    # T spawn: along the north wall ascending west, foot out on the open ramp east of the pit; the
+    # first version ran east from the pit's west end, where a pillar left 8 units to step on, and
+    # players coming from the spawn side hit risers. Heights count from the foot (the ramp is lower).
+    ('t_spawn', 1192, -2424, -657, -464, (0, 1), (-1, 0), 22),
     ('t_west', 720, -2192, -592, -496, (1, 0), (0, 1)),
     ('short', 1872, -1680, -656, -512, (0, -1), (-1, 0)),
     ('long_a', 2224, -1536, -656, -480, (1, 0), (0, -1)),
@@ -69,7 +72,7 @@ def surface(H, x, y, z_from, z_to):
     return z + 1
 
 
-def flight(H, x, y, floor, roof, d, up, run=RUN):
+def flight(H, x, y, floor, roof, d, up, run=RUN, width=WIDTH):
     """steps along the wall: the last tread is level with the roof behind it.
     floor / roof are reach.py feet heights at the top cell and on the roof. The wall line is where
     the ground under the top cell jumps up to the roof (an overhang counts: the stairs end under its edge)."""
@@ -88,12 +91,18 @@ def flight(H, x, y, floor, roof, d, up, run=RUN):
     n = len(heights)
     length = int(math.ceil((roof - floor) / RISE)) * run
     tread = length / n
-    end = (face[0] + up[0] * 4, face[1] + up[1] * 4)      # top tread ends half a cell past the top cell
+    end = face if tuple(up) == tuple(d) else (face[0] + up[0] * 4, face[1] + up[1] * 4)   # along a wall: half a cell past the top cell
     start = (end[0] - up[0] * length, end[1] - up[1] * length)
     brushes = []
+    if tuple(up) == tuple(d):               # flight runs straight at the wall, centred on the top cell
+        side = (abs(up[1]), abs(up[0]))
+        start = (start[0] - side[0] * width / 2, start[1] - side[1] * width / 2)
     for k in range(n):
         a = (start[0] + up[0] * k * tread, start[1] + up[1] * k * tread)
-        b = (a[0] + up[0] * tread - d[0] * WIDTH, a[1] + up[1] * tread - d[1] * WIDTH)
+        if tuple(up) == tuple(d):
+            b = (a[0] + up[0] * tread + side[0] * width, a[1] + up[1] * tread + side[1] * width)
+        else:
+            b = (a[0] + up[0] * tread - d[0] * width, a[1] + up[1] * tread - d[1] * width)
         lo = (round(min(a[0], b[0]), 2), round(min(a[1], b[1]), 2), floor - 8)
         hi = (round(max(a[0], b[0]), 2), round(max(a[1], b[1]), 2), round(floor + heights[k], 2))
         brushes.append(box(lo, hi))
@@ -121,7 +130,7 @@ def donor(out_dir):
              '_ambient': '255 255 255 75', 'angles': '0 60 0', 'pitch': '-60', '_light': '250 245 78 250'},
             {'classname': 'info_player_start', 'origin': '%d %d %d' % ((m0[0] + m0[3]) / 2, (m0[1] + m0[4]) / 2, (m0[2] + m0[5]) / 2)}]
     for name, x, y, f, r, d, up, *run in FLIGHTS:
-        b, face, floor, roof = flight(H, x, y, f, r, d, up, *run)
+        b, face, floor, roof = flight(H, x, y, f, r, d, up, *run)       # run[, width]
         ents.append({'classname': 'func_wall', 'targetname': 'stairs_' + name, '__brushes': b})
         print('%-8s wall face %s  %d steps  floor %d -> roof %d' % (name, face, len(b), floor, roof))
     ws = {'classname': 'worldspawn', 'mapversion': '220', 'skyname': 'sky_wasteland02',
@@ -160,6 +169,55 @@ def roof_spots(M, H, spacing=160):
     return picked
 
 
+def fix_spawns(path):
+    """move spawn points that a flight now covers to the nearest free spot (same floor, 80+ box
+    distance from every other spawn, like spawnspread.py); a spawn inside a step is stuck in game"""
+    import re
+    import bspents
+    from reachlib import box_distance
+    M = Map(path, grid=8, hulls=((1, 36),))
+    stairs = [M.models[int(e['model'][1:])] for e in M.ents if e.get('targetname', '').startswith('stairs_')]
+
+    def near_stairs(x, y, z, pad=24):
+        return any(m[0] - 16 - pad < x < m[3] + 16 + pad and m[1] - 16 - pad < y < m[4] + 16 + pad
+                   and m[2] - 36 < z < m[5] + 40 for m in stairs)
+
+    def free(o):
+        return all(M.contents(1, (o[0] + dx, o[1] + dy, o[2])) == -1 and not M.in_brush_model(1, (o[0] + dx, o[1] + dy, o[2]))
+                   for dx in (-4, 0, 4) for dy in (-4, 0, 4))
+    d, L, ents = bspents.read(path)
+    blocks = re.findall(r'\{[^}]*\}', ents)
+    spawns = []
+    for i, b in enumerate(blocks):
+        cls = re.search(r'"classname" "([^"]+)"', b).group(1)
+        if cls in ('info_player_start', 'info_player_deathmatch'):
+            spawns.append([i, tuple(map(float, re.search(r'"origin" "([^"]+)"', b).group(1).split()))])
+    moved = 0
+    for s in spawns:
+        i, (x, y, z) = s
+        if not near_stairs(x, y, z, 0) and free((x, y, z)):
+            continue
+        best = None
+        for r in range(8, 400, 8):
+            for a in range(0, 360, 10):
+                px, py = round(x + r * math.cos(math.radians(a))), round(y + r * math.sin(math.radians(a)))
+                sp = [f for f, h in M.spots(round(px / 8), round(py / 8)) if abs(f - (z - 36)) <= 48]
+                if not sp:
+                    continue
+                o = (px, py, round(min(sp, key=lambda v: abs(v - (z - 36)))) + 38)
+                if near_stairs(*o) or not free(o) or any(box_distance(o, t[1]) < 80 for t in spawns if t is not s):
+                    continue
+                best = o
+                break
+            if best:
+                break
+        s[1] = best
+        blocks[i] = re.sub(r'"origin" "[^"]+"', '"origin" "%d %d %d"' % best, blocks[i])
+        moved += 1
+    bspents.write(path, d, L, '\n'.join(blocks) + '\n')
+    return moved
+
+
 def finish(donor_bsp, out):
     tmp = out + '.graft.bsp'
     subprocess.check_call([sys.executable, os.path.join(TOOLS, 'bspgraft.py'), SRC, donor_bsp, tmp])
@@ -172,7 +230,7 @@ def finish(donor_bsp, out):
     bspents.write(out, d, L, ents.rstrip('\0').rstrip() + '\n' + add)
     os.remove(tmp)
     json.dump(spots, open(os.path.join(HERE, 'roofspots.json'), 'w'))
-    print('grenades', len(spots), '->', out)
+    print('grenades', len(spots), 'spawns moved off the stairs', fix_spawns(out), '->', out)
 
 
 if __name__ == '__main__':
