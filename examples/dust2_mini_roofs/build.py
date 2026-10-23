@@ -25,6 +25,10 @@ HL = r'C:/Program Files (x86)/Steam/steamapps/common/Half-Life'
 SRC = HL + '/cstrike/maps/de_dust2_mini.bsp'
 RISE, RUN, WIDTH = 16, 24, 64
 TREAD = ('SandCCrete', None, None)
+# textures swapped for another one already in the map (texinfo -> miptex only: the texture axes, and so
+# the lightmap extents, stay as they are). The signature on a roof is the original author's; credit
+# them in the video description instead.
+RETEXTURE = {'k_mapbyknifeman': 'SandCCrete'}
 SIDE = ('SandTrim', None, None)
 
 # found with sites.py (reachable street next to a wall whose top is a reachable roof, flat run along
@@ -218,6 +222,28 @@ def fix_spawns(path):
     return moved
 
 
+def retexture(path, table):
+    """point every texinfo that uses texture A at texture B (both already in the BSP's texture lump)"""
+    import struct
+    d = bytearray(open(path, 'rb').read())
+    to, tl = struct.unpack_from('<ii', d, 4 + 8 * 2)
+    n, = struct.unpack_from('<i', d, to)
+    offs = struct.unpack_from('<%di' % n, d, to + 4)
+    names = [bytes(d[to + o:to + o + 16]).split(b'\0')[0].decode('latin1').lower() if o >= 0 else '' for o in offs]
+    io, il = struct.unpack_from('<ii', d, 4 + 8 * 6)
+    changed = 0
+    for src, dst in table.items():
+        if src.lower() not in names or dst.lower() not in names:
+            continue
+        a, b = names.index(src.lower()), names.index(dst.lower())
+        for k in range(il // 40):
+            if struct.unpack_from('<i', d, io + 40 * k + 32)[0] == a:
+                struct.pack_into('<i', d, io + 40 * k + 32, b)
+                changed += 1
+    open(path, 'wb').write(bytes(d))
+    return changed
+
+
 def finish(donor_bsp, out):
     tmp = out + '.graft.bsp'
     subprocess.check_call([sys.executable, os.path.join(TOOLS, 'bspgraft.py'), SRC, donor_bsp, tmp])
@@ -230,7 +256,8 @@ def finish(donor_bsp, out):
     bspents.write(out, d, L, ents.rstrip('\0').rstrip() + '\n' + add)
     os.remove(tmp)
     json.dump(spots, open(os.path.join(HERE, 'roofspots.json'), 'w'))
-    print('grenades', len(spots), 'spawns moved off the stairs', fix_spawns(out), '->', out)
+    print('grenades', len(spots), 'spawns moved off the stairs', fix_spawns(out),
+          'texinfos retextured', retexture(out, RETEXTURE), '->', out)
 
 
 if __name__ == '__main__':
